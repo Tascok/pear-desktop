@@ -1,0 +1,33 @@
+diff --git a/out/util/macosIconComposer.js b/out/util/macosIconComposer.js
+index f1053dc9a0958f7752c933c4b49089dfb06d77cc..d7920b841a7707c6713fe7468fef4dd0a0eaee52 100644
+--- a/out/util/macosIconComposer.js
++++ b/out/util/macosIconComposer.js
+@@ -8,7 +8,7 @@ const os = require("node:os");
+ const path = require("node:path");
+ const plist = require("plist");
+ const semver = require("semver");
+-const INVALID_ACTOOL_VERSION_ERROR = new Error("Failed to check actool version. Is Xcode 26 or higher installed? See output of the `actool --version` CLI command for more details.");
++const INVALID_ACTOOL_VERSION_ERROR = new Error("Failed to check actool version. Is Xcode 16 or higher installed? See output of the `actool --version` CLI command for more details.");
+ async function checkActoolVersion(tmpDir) {
+     const acToolOutputFileName = path.resolve(tmpDir, "actool.log");
+     let versionInfo = undefined;
+@@ -32,8 +32,8 @@ async function checkActoolVersion(tmpDir) {
+         throw INVALID_ACTOOL_VERSION_ERROR;
+     }
+     const acToolVersion = versionInfo["com.apple.actool.version"]["short-bundle-version"];
+-    if (!semver.gte(semver.coerce(acToolVersion), "26.0.0")) {
+-        throw new Error(`Unsupported actool version. Must be on actool 26.0.0 or higher but found ${acToolVersion}. Install Xcode 26 or higher to get a supported version of actool.`);
++    if (!semver.gte(semver.coerce(acToolVersion), "16.0.0")) {
++        throw new Error(`Unsupported actool version. Must be on actool 16.0.0 or higher but found ${acToolVersion}. Install Xcode 16 or higher to get a supported version of actool.`);
+     }
+ }
+ /**
+@@ -87,7 +87,7 @@ async function generateAssetCatalogForIcon(inputPath) {
+             "--target-device",
+             "mac",
+             "--minimum-deployment-target",
+-            "26.0",
++            "16.0",
+             "--platform",
+             "macosx",
+         ]);
