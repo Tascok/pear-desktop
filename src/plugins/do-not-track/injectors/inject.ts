@@ -12,6 +12,18 @@ interface PrunableResponse {
   playerAds?: unknown;
   adPlacements?: unknown;
   adSlots?: unknown;
+  adBreak?: unknown;
+  adParams?: unknown;
+  adIsBlocked?: unknown;
+  adVideoId?: unknown;
+  adSequence?: unknown;
+  adDurationMs?: unknown;
+  adAbort?: unknown;
+  adSkip?: unknown;
+  adType?: unknown;
+  adMacro?: unknown;
+  adBlocking?: unknown;
+  adReplacement?: unknown;
   playerResponse?: PrunableResponse;
   ytInitialPlayerResponse?: PrunableResponse;
   [key: string]: unknown;
@@ -33,19 +45,43 @@ export const isInjected = (): boolean => injected;
 export const inject = (contextBridge: ContextBridge): void => {
   injected = true;
   {
+    const AD_FIELDS = [
+      'playerAds',
+      'adPlacements',
+      'adSlots',
+      'adBreak',
+      'adParams',
+      'adIsBlocked',
+      'adVideoId',
+      'adSequence',
+      'adDurationMs',
+      'adAbort',
+      'adSkip',
+      'adType',
+      'adMacro',
+      'adBlocking',
+      'adReplacement',
+    ] as const;
+
+    const pruneAdFields = (obj: Record<string, unknown>) => {
+      for (const field of AD_FIELDS) {
+        delete obj[field];
+      }
+      // Also delete any field starting with 'ad' or containing 'ad' as a prefix pattern
+      for (const key of Object.keys(obj)) {
+        if (/^ad/i.test(key) && !AD_FIELDS.includes(key as typeof AD_FIELDS[number])) {
+          delete obj[key];
+        }
+      }
+    };
+
     const pruner = (o: PrunableResponse): PrunableResponse => {
-      delete o.playerAds;
-      delete o.adPlacements;
-      delete o.adSlots;
+      pruneAdFields(o);
       if (o.playerResponse) {
-        delete o.playerResponse.playerAds;
-        delete o.playerResponse.adPlacements;
-        delete o.playerResponse.adSlots;
+        pruneAdFields(o.playerResponse as unknown as Record<string, unknown>);
       }
       if (o.ytInitialPlayerResponse) {
-        delete o.ytInitialPlayerResponse.playerAds;
-        delete o.ytInitialPlayerResponse.adPlacements;
-        delete o.ytInitialPlayerResponse.adSlots;
+        pruneAdFields(o.ytInitialPlayerResponse as unknown as Record<string, unknown>);
       }
 
       return o;

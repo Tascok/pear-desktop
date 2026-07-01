@@ -4,3 +4,4 @@ export { NotFoundKaomoji } from './NotFoundKaomoji';
 export { LyricsPicker } from './LyricsPicker';
 export { SyncedLine } from './SyncedLine';
 export { PlainLyrics } from './PlainLyrics';
+export { PauseIndicator } from './PauseIndicator';

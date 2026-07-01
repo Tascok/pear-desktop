@@ -15,6 +15,7 @@ import {
   NotFoundKaomoji,
   SyncedLine,
   PlainLyrics,
+  PauseIndicator,
 } from './components';
 import { LyricsPicker } from './components/LyricsPicker';
 import { reactiveOwner } from './reactive-root';
@@ -41,7 +42,7 @@ runWithOwner(reactiveOwner, () => {
         root.style.setProperty('--lyrics-padding', '2rem');
         root.style.setProperty(
           '--lyrics-animations',
-          'lyrics-glow var(--lyrics-glow-duration) forwards, lyrics-wobble var(--lyrics-wobble-duration) forwards',
+          'lyrics-glow var(--lyrics-glow-duration) ease-in-out infinite alternate, lyrics-wobble var(--lyrics-wobble-duration) ease-in-out infinite alternate',
         );
 
         root.style.setProperty('--lyrics-inactive-font-weight', '700');
@@ -53,6 +54,9 @@ runWithOwner(reactiveOwner, () => {
         root.style.setProperty('--lyrics-active-opacity', '1');
         root.style.setProperty('--lyrics-active-scale', '1');
         root.style.setProperty('--lyrics-active-offset', '0');
+
+        root.style.setProperty('--lyrics-word-active-scale', '1.12');
+        root.style.setProperty('--lyrics-word-glow-color', 'rgba(255, 255, 255, 0.6)');
         break;
       case 'scale':
         root.style.setProperty(
@@ -76,6 +80,9 @@ runWithOwner(reactiveOwner, () => {
         root.style.setProperty('--lyrics-active-opacity', '1');
         root.style.setProperty('--lyrics-active-scale', '1.2');
         root.style.setProperty('--lyrics-active-offset', '0');
+
+        root.style.setProperty('--lyrics-word-active-scale', '1.25');
+        root.style.setProperty('--lyrics-word-glow-color', 'rgba(255, 255, 255, 0)');
         break;
       case 'offset':
         root.style.setProperty(
@@ -99,6 +106,9 @@ runWithOwner(reactiveOwner, () => {
         root.style.setProperty('--lyrics-active-opacity', '1');
         root.style.setProperty('--lyrics-active-scale', '1');
         root.style.setProperty('--lyrics-active-offset', '5%');
+
+        root.style.setProperty('--lyrics-word-active-scale', '1.1');
+        root.style.setProperty('--lyrics-word-glow-color', 'rgba(255, 255, 255, 0.3)');
         break;
       case 'focus':
         root.style.setProperty(
@@ -122,6 +132,9 @@ runWithOwner(reactiveOwner, () => {
         root.style.setProperty('--lyrics-active-opacity', '1');
         root.style.setProperty('--lyrics-active-scale', '1');
         root.style.setProperty('--lyrics-active-offset', '0');
+
+        root.style.setProperty('--lyrics-word-active-scale', '1.06');
+        root.style.setProperty('--lyrics-word-glow-color', 'rgba(255, 255, 255, 0.35)');
         break;
     }
   });
@@ -135,10 +148,16 @@ type LyricsRendererChild =
   | {
       kind: 'SyncedLine';
       line: LineLyrics;
+      lineIndex: number;
     }
   | {
       kind: 'PlainLine';
       line: string;
+    }
+  | {
+      kind: 'PauseIndicator';
+      startTime: number;
+      endTime: number;
     };
 
 const lyricsPicker: LyricsRendererChild = { kind: 'LyricsPicker' };
@@ -211,10 +230,58 @@ export const LyricsRenderer = () => {
       }
 
       if (data?.lines) {
-        return data.lines.map((line) => ({
-          kind: 'SyncedLine' as const,
-          line,
-        }));
+        // Detect the most common voice — if >50% lines share a non-lead voice,
+        // treat it as the actual lead so they don't get mis-positioned.
+        const voiceCounts = new Map<string, number>();
+        for (const l of data.lines) {
+          const key = l.voice ?? '__none__';
+          voiceCounts.set(key, (voiceCounts.get(key) ?? 0) + 1);
+        }
+
+        let primaryVoice: string | undefined;
+        let maxCount = 0;
+        for (const [v, c] of voiceCounts) {
+          if (c > maxCount) {
+            maxCount = c;
+            primaryVoice = v === '__none__' ? undefined : v;
+          }
+        }
+
+        const isPrimaryUnknown =
+          primaryVoice !== undefined &&
+          !/^(lead|v1|vocal[ -]?1|solo)$/i.test(primaryVoice);
+
+        // Build children with pause indicators between lines with big gaps (>2s)
+        const result: LyricsRendererChild[] = [];
+        for (let i = 0; i < data.lines.length; i++) {
+          const line = data.lines[i];
+          result.push({
+            kind: 'SyncedLine' as const,
+            line: {
+              ...line,
+              voice:
+                isPrimaryUnknown && line.voice === primaryVoice
+                  ? undefined
+                  : line.voice,
+            },
+            lineIndex: i,
+          });
+          
+          // Check if there's a big enough gap after this line to add a pause indicator
+          if (i < data.lines.length - 1) {
+            const nextLine = data.lines[i + 1];
+            const thisLineEnd = line.timeInMs + line.duration;
+            const gap = nextLine.timeInMs - thisLineEnd;
+            if (gap > 2000) { // more than 2 seconds gap
+              result.push({
+                kind: 'PauseIndicator' as const,
+                startTime: thisLineEnd,
+                endTime: nextLine.timeInMs,
+              });
+            }
+          }
+        }
+        return result;
       }
 
       if (data?.lyrics) {
@@ -261,18 +328,30 @@ export const LyricsRenderer = () => {
 
   createEffect(() => {
     const current = currentLyrics();
-    const idx = currentIndex();
-    const maxIdx = untrack(statuses).length - 1;
+    const lineIdx = currentIndex(); // index of current line in original data.lines array
+    const childList = children();
 
     if (!scroller() || !current.data?.lines) return;
 
-    // hacky way to make the "current" line scroll to the center of the screen
-    const scrollIndex = Math.min(idx + 1, maxIdx);
+    // Find the actual index in the VList data array ([lyricsPicker, ...children()])
+    // that corresponds to the current line
+    let vlistIndex = 0; // start at 0, but LyricsPicker is at index 0, so start checking from children()
+    let found = false;
+    for (let i = 0; i < childList.length; i++) {
+      const child = childList[i];
+      if (child.kind === 'SyncedLine' && child.lineIndex === lineIdx) {
+        vlistIndex = i + 1; // +1 because of the lyricsPicker at index 0
+        found = true;
+        break;
+      }
+    }
 
-    scroller()!.scrollToIndex(scrollIndex, {
-      smooth: true,
-      align: 'center',
-    });
+    if (found) {
+      scroller()!.scrollToIndex(vlistIndex, {
+        smooth: true,
+        align: 'center',
+      });
+    }
   });
 
   return (
@@ -304,12 +383,15 @@ export const LyricsRenderer = () => {
                   {...props}
                   index={idx()}
                   scroller={scroller()!}
-                  status={statuses()[idx() - 1]}
+                  status={statuses()[props.lineIndex]}
                 />
               );
             }
             case 'PlainLine': {
               return <PlainLyrics {...props} />;
+            }
+            case 'PauseIndicator': {
+              return <PauseIndicator {...props} />;
             }
           }
         }}

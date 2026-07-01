@@ -18,6 +18,13 @@ export type SyncedLyricsPluginConfig = {
 
 export type LineLyricsStatus = 'previous' | 'current' | 'upcoming';
 
+export type LineWord = {
+  timeInMs: number;
+  word: string;
+  duration?: number;
+  isBackground?: boolean; // true when span has role="x-bg" (backing vocal)
+};
+
 export type LineLyrics = {
   time: string;
   timeInMs: number;
@@ -25,6 +32,8 @@ export type LineLyrics = {
 
   text: string;
   status: LineLyricsStatus;
+  words?: LineWord[];     // word-level timestamps (BetterLyrics etc.)
+  voice?: string;          // 'lead' | 'backing' | 'duet' | etc (BetterLyrics)
 };
 
 export type LineEffect = 'fancy' | 'scale' | 'offset' | 'focus';

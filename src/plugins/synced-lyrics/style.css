@@ -46,22 +46,20 @@
   --lyrics-active-scale: 1;
   --lyrics-active-offset: 0;
 
+  /* Word-level Active (overrides line-level for individual words) */
+  --lyrics-word-active-color: #fff;
+  --lyrics-inactive-text-color: #888;
+
   --lyrics-duration: 2s;
 
-  /* Animations */
-  --lyrics-animations:
-    lyrics-glow var(--lyrics-glow-duration) forwards,
-    lyrics-wobble var(--lyrics-wobble-duration) forwards;
   --lyrics-scale-duration: 0.166s;
   --lyrics-opacity-transition: 0.33s;
-  --lyrics-glow-duration: var(--lyrics-duration);
-  --lyrics-wobble-duration: calc(var(--lyrics-duration) / 2);
 
   /* Colors */
   --glow-color: rgba(255, 255, 255, 0.5);
 }
 
-.lyric-container {
+pnpm start.lyric-container {
   padding-top: 16px;
   height: 100%;
 }
@@ -133,22 +131,106 @@
   }
 }
 
-.text-lyrics > span > span {
+/* ─── Word-level Karaoke Fill — slides left-to-right ─── */
+.text-lyrics > span > span,
+.text-lyrics .bg-block > span {
   display: inline-block;
   white-space: pre-wrap;
-  opacity: var(--lyrics-inactive-opacity);
-  transition: opacity var(--lyrics-opacity-transition);
+
+  /* Gradient slides: left = active color, right = inactive color */
+  background-image:
+    linear-gradient(
+      to right,
+      var(--lyrics-word-active-color, #fff) 50%,
+      var(--lyrics-inactive-text-color, #888) 50%
+    );
+  background-size: 200% 100%;
+  background-position: calc((1 - var(--word-progress, 0)) * 100%) 0;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-repeat: no-repeat;
+
+  transition: background-position 0.05s linear, transform 0.15s ease-in-out;
 }
 
+/* ─── Non-word-timestamp lines (simple smooth color transition) ─── */
+.text-lyrics > span > span.no-word-timestamps {
+  background-image: none;
+  -webkit-text-fill-color: initial;
+  background-clip: initial;
+}
+
+/* ─── Word glows softly while being sung (tied to progress) ─── */
+.word-glow {
+  /* Glow will be controlled via JS inline styles based on word progress */
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+/* ─── Background-vocal block: centered, smaller, animate in/out ─── */
+.bg-block {
+  display: block;
+  text-align: center !important;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  transition: 
+    height 0.4s ease-out, 
+    margin-top 0.4s ease-out, 
+    margin-bottom 0.4s ease-out,
+    opacity 0.4s ease-out;
+}
+
+.bg-block .word-bg {
+  font-size: 0.7em !important;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Add transition to synced-line and container for smooth layout shifts */
+.synced-line {
+  transition: 
+    transform 0.3s ease-out, 
+    opacity 0.3s ease-out, 
+    margin-top 0.3s ease-out, 
+    margin-bottom 0.3s ease-out;
+}
+
+.synced-lyrics-vlist > div {
+  transition: transform 0.3s ease-out;
+}
+
+/* ─── Previous line — fully dimmed ─── */
+.previous .text-lyrics > span > span,
+.previous .text-lyrics .bg-block > span {
+  background-image: none !important;
+  -webkit-text-fill-color: var(--lyrics-inactive-text-color, #888) !important;
+  opacity: 0.3;
+}
+
+/* ─── Upcoming line ─── */
+.upcoming .text-lyrics {
+  opacity: 0.5;
+}
+
+/* ─── Line-level: current ─── */
 .current .text-lyrics {
   font-weight: var(--lyrics-active-font-weight) !important;
-  scale: var(--lyrics-active-scale);
-  translate: var(--lyrics-active-offset);
 }
 
-.current .text-lyrics > span > span {
-  opacity: var(--lyrics-active-opacity);
-  animation: var(--lyrics-animations);
+/* ─── Voice layout ─── */
+
+/* Agent-based backing (v3+, backing): centered, smaller, italic */
+.synced-line.voice-backing .text-lyrics {
+  text-align: center !important;
+  font-size: 0.75em !important;
+  font-style: italic;
+  opacity: 0.65;
+}
+
+/* Agent-based duet (v2, duet): right-aligned */
+.synced-line.voice-duet .text-lyrics {
+  text-align: right !important;
+  opacity: 0.85;
 }
 
 .lyrics-renderer {
@@ -270,4 +352,81 @@ div:has(> .lyrics-picker) {
 .lyrics-picker mdui-icon-check-circle,
 .lyrics-picker mdui-icon-warning {
   font-size: 24px;
+}
+
+/* Virtual list smooth scroll */
+.synced-lyrics-vlist {
+  scroll-behavior: smooth;
+}
+
+/* Apple Music style pause indicator */
+.pause-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 1rem 0;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+/* Entering state */
+.pause-indicator.pause-entering {
+  opacity: 0.7;
+  transform: translateY(0);
+}
+
+/* Active state */
+.pause-indicator.pause-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pause-indicator.pause-active .pause-dot {
+  animation: pause-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.pause-indicator.pause-active .pause-dot:nth-child(1) { animation-delay: 0s; }
+.pause-indicator.pause-active .pause-dot:nth-child(2) { animation-delay: 0.2s; }
+.pause-indicator.pause-active .pause-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Exiting state: jumps up, then down and fades out! */
+.pause-indicator.pause-exiting {
+  animation: pause-exit 0.6s ease-out forwards;
+}
+
+@keyframes pause-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.pause-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lyrics-inactive-text-color, #888);
+}
+
+@keyframes pause-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+    background: var(--lyrics-inactive-text-color, #888);
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+    background: var(--lyrics-word-active-color, #fff);
+  }
 }

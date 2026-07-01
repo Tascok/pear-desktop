@@ -1,3 +1,7 @@
+import {
+  enhanceWebRequest,
+  type BetterSession,
+} from '@jellybrick/electron-better-web-request';
 import { contextBridge, webFrame, type BrowserWindow } from 'electron';
 
 import { t } from '@/i18n';
@@ -46,7 +50,7 @@ export default createPlugin({
   description: () => t('plugins.do-not-track.description'),
   restartNeeded: false,
   config: {
-    enabled: false,
+    enabled: true,
     cache: true,
     blocker: blockers.InPlayer,
     additionalBlockLists: [],
@@ -83,6 +87,50 @@ export default createPlugin({
           config.disableDefaultLists,
         );
       }
+
+      // Enable multiple webRequest listeners support
+      const session = window.webContents.session as BetterSession;
+      enhanceWebRequest(session);
+
+      // Set up resolver for onBeforeRequest so ALL matching listeners are applied
+      // and the request is cancelled if ANY listener cancels it
+      session.webRequest.setResolver('onBeforeRequest', (listeners) => {
+        return Promise.all(
+          listeners.map((l) => l.apply()),
+        ).then((results) => {
+          // Merge: if any listener cancels, cancel; keep redirectURL if set
+          const merged: Electron.CallbackResponse = { cancel: false };
+          for (const result of results) {
+            if (result?.cancel) merged.cancel = true;
+            if (result?.redirectURL) {
+              merged.redirectURL = result.redirectURL;
+            }
+          }
+          return merged;
+        });
+      });
+
+      // Block ad/tracker domains at the network level
+      // This catches requests that the JSON pruner might miss
+      const adDomains = [
+        '*://*.doubleclick.net/*',
+        '*://*.googlesyndication.com/*',
+        '*://*.googleadservices.com/*',
+        '*://*.googletagservices.com/*',
+        '*://*.googletagmanager.com/*',
+        '*://*.google-analytics.com/*',
+        '*://*.pagead2.googlesyndication.com/*',
+        '*://*.adservice.google.com/*',
+        '*://*.s0.2mdn.net/*',
+        '*://*.an-youtube-music-ads.googleusercontent.com/*',
+      ];
+
+      session.webRequest.onBeforeRequest(
+        { urls: adDomains },
+        (_details, callback) => {
+          callback({ cancel: true });
+        },
+      );
     },
     stop({ window }) {
       if (isBlockerEnabled(window.webContents.session)) {

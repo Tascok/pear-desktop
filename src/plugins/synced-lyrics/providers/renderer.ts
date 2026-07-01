@@ -1,4 +1,5 @@
 import { ProviderNames } from './index';
+import { BetterLyrics } from './BetterLyrics';
 import { LRCLib } from './LRCLib';
 import { LyricsGenius } from './LyricsGenius';
 import { MusixMatch } from './MusixMatch';
@@ -9,5 +10,6 @@ export const providers = {
   [ProviderNames.LRCLib]: new LRCLib(),
   [ProviderNames.MusixMatch]: new MusixMatch(),
   [ProviderNames.LyricsGenius]: new LyricsGenius(),
+  [ProviderNames.BetterLyrics]: new BetterLyrics(),
   // [ProviderNames.Megalobiz]: new Megalobiz(), // Disabled because it is too unstable and slow
 } as const;
