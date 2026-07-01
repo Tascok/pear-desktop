@@ -8,11 +8,11 @@
   "main": "./dist/main/index.js",
   "type": "module",
   "license": "MIT",
-  "repository": "pear-devs/pear-desktop",
+  "repository": "Tascok/pear-desktop",
   "author": {
     "name": "th-ch",
     "email": "th-ch@users.noreply.github.com",
-    "url": "https://github.com/pear-devs/pear-desktop"
+    "url": "https://github.com/Tascok/pear-desktop"
   },
   "scripts": {
     "postinstall": "pnpm install-electron",
