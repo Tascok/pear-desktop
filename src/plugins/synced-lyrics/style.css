@@ -181,6 +181,12 @@
   transition: none !important;
 }
 
+/* If no word timestamps, the current active line text should be solid white */
+.current .text-lyrics .no-word-timestamps {
+  color: var(--lyrics-word-active-color, #fff) !important;
+  -webkit-text-fill-color: var(--lyrics-word-active-color, #fff) !important;
+}
+
 /* ─── Background-vocal block: centered, smaller, animate in/out ─── */
 .bg-block {
   display: block;
@@ -503,9 +509,7 @@ body.has-synced-lyrics-bg.webgl-active #player-page,
 body.has-synced-lyrics-bg.webgl-active ytmusic-player-page,
 body.has-synced-lyrics-bg.webgl-active #tab-renderer,
 body.has-synced-lyrics-bg.webgl-active #tab-renderer[page-type='MUSIC_PAGE_TYPE_TRACK_LYRICS'],
-body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar,
 body.has-synced-lyrics-bg.webgl-active #nav-bar-background,
-body.has-synced-lyrics-bg.webgl-active #player-bar-background,
 body.has-synced-lyrics-bg.webgl-active ytmusic-nav-bar,
 body.has-synced-lyrics-bg.webgl-active tp-yt-app-drawer,
 body.has-synced-lyrics-bg.webgl-active #guide-content,
@@ -516,6 +520,15 @@ body.has-synced-lyrics-bg.webgl-active #content-grid-renderer,
 body.has-synced-lyrics-bg.webgl-active ytmusic-responsive-list-item-renderer,
 body.has-synced-lyrics-bg.webgl-active .main-window,
 body.has-synced-lyrics-bg.webgl-active ytmusic-thumbnail-renderer {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Player bar stays transparent so the WebGL shader shows through,
+   matching the rest of the immersive background */
+body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar,
+body.has-synced-lyrics-bg.webgl-active #player-bar-background {
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
@@ -532,6 +545,20 @@ body.has-synced-lyrics-bg::before {
   background: rgba(3, 3, 3, 0.3);
   z-index: -1;
   pointer-events: none;
+}
+
+/* Subtle bottom gradient only on the player bar area so controls stay
+   readable without making the bar fully opaque */
+body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 60%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .synced-lyrics-bg-canvas {
