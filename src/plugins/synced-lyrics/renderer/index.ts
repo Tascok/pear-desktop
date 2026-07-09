@@ -1,6 +1,7 @@
 import { createRenderer } from '@/utils';
 import { waitForElement } from '@/utils/wait-for-element';
 
+import { updateBackdropColors, triggerBackdropBeat, initBackdrop, destroyBackdrop } from './backdrop';
 import { disposeReactiveRoot } from './reactive-root';
 import { setConfig, setCurrentTime } from './renderer';
 import { fetchLyrics } from './store';
@@ -16,6 +17,7 @@ export let netFetch: (
   url: string,
   init?: RequestInit,
 ) => Promise<[number, string, Record<string, string>]>;
+export let saveConfig: (config: Partial<SyncedLyricsPluginConfig>) => void = () => {};
 
 export const renderer = createRenderer<
   {
@@ -54,10 +56,14 @@ export const renderer = createRenderer<
   },
   async videoDataChange() {
     if (!this.updateTimestampInterval) {
-      this.updateTimestampInterval = setInterval(
-        () => setCurrentTime((_ytAPI?.getCurrentTime() ?? 0) * 1000),
-        100,
-      );
+      const tick = () => {
+        const video = document.querySelector('video');
+        if (video) {
+          setCurrentTime(video.currentTime * 1000);
+        }
+        this.updateTimestampInterval = requestAnimationFrame(tick);
+      };
+      this.updateTimestampInterval = requestAnimationFrame(tick);
     }
 
     // prettier-ignore
@@ -77,15 +83,36 @@ export const renderer = createRenderer<
 
   async start(ctx: RendererContext<SyncedLyricsPluginConfig>) {
     netFetch = ctx.ipc.invoke.bind(ctx.ipc, 'synced-lyrics:fetch');
+    saveConfig = (newConfig) => ctx.setConfig(newConfig);
 
     setConfig(await ctx.getConfig());
 
+    let canvas = document.querySelector<HTMLCanvasElement>('#synced-lyrics-global-backdrop');
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.id = 'synced-lyrics-global-backdrop';
+      canvas.className = 'synced-lyrics-bg-canvas';
+      document.body.appendChild(canvas);
+    }
+    initBackdrop(canvas);
+    document.body.classList.add('has-synced-lyrics-bg', 'webgl-active');
+
     ctx.ipc.on('peard:update-song-info', (info: SongInfo) => {
       fetchLyrics(info);
+      if (info && info.imageSrc) {
+        updateBackdropColors(info.imageSrc);
+        triggerBackdropBeat();
+      }
     });
   },
 
   stop() {
+    destroyBackdrop();
+    const canvas = document.querySelector('#synced-lyrics-global-backdrop');
+    if (canvas) {
+      canvas.remove();
+    }
+    document.body.classList.remove('has-synced-lyrics-bg', 'webgl-active');
     disposeReactiveRoot();
   },
 });

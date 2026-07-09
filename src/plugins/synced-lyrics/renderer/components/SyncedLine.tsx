@@ -21,6 +21,7 @@ import {
 interface SyncedLineProps {
   scroller: VirtualizerHandle;
   index: number;
+  lineIndex: number;
 
   line: LineLyrics;
   status: 'upcoming' | 'current' | 'previous';
@@ -182,6 +183,43 @@ export const SyncedLine = (props: SyncedLineProps) => {
     return groups;
   });
 
+  // Pre-calculate the exact spacing/punctuation between words from the original line text
+  const wordTexts = createMemo((): string[] => {
+    const words = displayWords();
+    const fullText = text();
+    const result: string[] = [];
+    
+    let currentIndex = 0;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i].word;
+      let pos = fullText.indexOf(w, currentIndex);
+      if (pos === -1) {
+        pos = fullText.indexOf(w);
+      }
+      
+      if (pos === -1) {
+        result.push(w + ' ');
+        continue;
+      }
+      
+      const endPos = pos + w.length;
+      let nextPos = fullText.length;
+      
+      if (i + 1 < words.length) {
+        const nextW = words[i + 1].word;
+        const nPos = fullText.indexOf(nextW, endPos);
+        if (nPos !== -1) {
+          nextPos = nPos;
+        }
+      }
+      
+      const betweenText = fullText.substring(endPos, nextPos);
+      result.push(w + betweenText);
+      currentIndex = nextPos;
+    }
+    return result;
+  });
+
   return (
     <Show fallback={<EmptyLine {...props} />} when={text()}>
       <div
@@ -212,35 +250,10 @@ export const SyncedLine = (props: SyncedLineProps) => {
             }}
           >
             <Show
-              when={hasWords()}
               fallback={
                 <span>
                   <span
                     class="no-word-timestamps"
-                    ref={(el) => {
-                      if (!el) return;
-                      createEffect(() => {
-                        // Smooth fade/scale animation for non-word-timestamp providers
-                        const status = lineStatus();
-                        if (status === 'current') {
-                          el.style.transition = 'all 0.3s ease-out';
-                          el.style.color = 'var(--lyrics-word-active-color)';
-                          el.style.fontWeight = 'var(--lyrics-active-font-weight)';
-                          el.style.opacity = '1';
-                        } else if (status === 'previous') {
-                          el.style.transition = 'all 0.5s ease-out';
-                          el.style.color = 'var(--lyrics-inactive-text-color)';
-                          el.style.opacity = '0.3';
-                          el.style.fontWeight = 'var(--lyrics-inactive-font-weight)';
-                        } else {
-                          // Upcoming
-                          el.style.transition = 'all 0.3s ease-out';
-                          el.style.color = 'var(--lyrics-inactive-text-color)';
-                          el.style.opacity = '0.5';
-                          el.style.fontWeight = 'var(--lyrics-inactive-font-weight)';
-                        }
-                      });
-                    }}
                   >
                     <yt-formatted-string
                       text={{ runs: [{ text: text() }] }}
@@ -248,11 +261,12 @@ export const SyncedLine = (props: SyncedLineProps) => {
                   </span>
                 </span>
               }
+              when={hasWords()}
             >
               <For each={wordGroups()}>
                 {(group) => {
                   // Create bgBlockRef here so it's accessible in both Show branches
-                  let bgBlockRef: HTMLSpanElement | undefined;
+                  let bgBlockRef: HTMLSpanElement | null = null;
                   const [naturalHeight, setNaturalHeight] = createSignal(0);
                   
                   const shouldShowBg = createMemo(() => {
@@ -305,81 +319,74 @@ export const SyncedLine = (props: SyncedLineProps) => {
                         <span>
                           <For each={group.words}>
                             {(word, idx) => {
-                          const globalIndex = group.indices[idx()];
-                          let wordRef: HTMLSpanElement | undefined;
-                          createEffect(() => {
-                            const progress = wordProgress()[globalIndex];
-                            if (wordRef) {
-                              wordRef.style.setProperty('--word-progress', String(progress));
-                              const isActive = progress > 0 && progress < 1;
-                              wordRef.classList.toggle('word-glow', isActive);
-                              if (isActive) {
-                                // Calculate glow intensity based on sine wave (peaks at 0.5 progress)
-                                const glowIntensity = Math.sin(progress * Math.PI); // 0 → 1 → 0
-                                const glowSize = 3 + glowIntensity * 7; // 3px → 10px
-                                const glowOpacity = 0.3 + glowIntensity * 0.5; // 0.3 → 0.8
-                                wordRef.style.textShadow = `0 0 ${glowSize}px rgba(255, 255, 255, ${glowOpacity})`;
-                                const yOffset = Math.sin(progress * Math.PI) * -4;
-                                const scale = 1 + Math.sin(progress * Math.PI) * 0.03;
-                                wordRef.style.transform = `translateY(${yOffset}px) scale(${scale})`;
-                              } else {
-                                wordRef.style.textShadow = '';
-                                wordRef.style.transform = '';
-                              }
-                            }
-                          });
-                          return (
-                            <span ref={wordRef!}>
-                              <yt-formatted-string
-                                text={{ runs: [{ text: `${word.word} ` }] }}
-                              />
-                            </span>
-                          );
-                        }}
+                              const globalIndex = group.indices[idx()];
+                              let wordRef: HTMLSpanElement | null = null;
+                              createEffect(() => {
+                                const progress = wordProgress()[globalIndex];
+                                if (wordRef) {
+                                  wordRef.style.setProperty('--word-progress', String(progress));
+                                  wordRef.style.setProperty('--word-glow', String(Math.sin(progress * Math.PI)));
+                                  wordRef.style.setProperty('--word-duration', `${word.duration || 300}ms`);
+                                  wordRef.classList.toggle('word-active', progress > 0 && progress < 1);
+                                  wordRef.classList.toggle('word-done', progress >= 1);
+                                }
+                              });
+                              return (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    _ytAPI?.seekTo((word.timeInMs + 10) / 1000);
+                                  }}
+                                  ref={(el) => { wordRef = el; }}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <yt-formatted-string
+                                    text={{ runs: [{ text: wordTexts()[globalIndex] }] }}
+                                  />
+                                </span>
+                              );
+                            }}
                           </For>
                         </span>
                       </Show>
                       {group.isBackground && (
                         <span 
                           class="bg-block" 
-                          ref={bgBlockRef!}
+                          ref={(el) => { bgBlockRef = el; }}
                           style={{ 
-                            opacity: 0, 
-                            transform: 'translateY(10px) scale(0.9)',
-                            height: '0px',
+                            'opacity': 0, 
+                            'transform': 'translateY(10px) scale(0.9)',
+                            'height': '0px',
                             'margin-top': '0px',
-                            'margin-bottom': '0px'
+                            'margin-bottom': '0px',
                           }}
                         >
                           <For each={group.words}>
                             {(word, idx) => {
                               const globalIndex = group.indices[idx()];
-                              let wordRef: HTMLSpanElement | undefined;
+                              let wordRef: HTMLSpanElement | null = null;
                               createEffect(() => {
                                 const progress = wordProgress()[globalIndex];
                                 if (wordRef) {
                                   wordRef.style.setProperty('--word-progress', String(progress));
-                                  const isActive = progress > 0 && progress < 1;
-                                  wordRef.classList.toggle('word-glow', isActive);
-                                  if (isActive) {
-                                    // Same glow effect but slightly softer for background
-                                    const glowIntensity = Math.sin(progress * Math.PI);
-                                    const glowSize = 2 + glowIntensity * 5;
-                                    const glowOpacity = 0.2 + glowIntensity * 0.4;
-                                    wordRef.style.textShadow = `0 0 ${glowSize}px rgba(255, 255, 255, ${glowOpacity})`;
-                                    const yOffset = Math.sin(progress * Math.PI) * -3;
-                                    const scale = 1 + Math.sin(progress * Math.PI) * 0.02;
-                                    wordRef.style.transform = `translateY(${yOffset}px) scale(${scale})`;
-                                  } else {
-                                    wordRef.style.textShadow = '';
-                                    wordRef.style.transform = '';
-                                  }
+                                  wordRef.style.setProperty('--word-glow', String(Math.sin(progress * Math.PI)));
+                                  wordRef.style.setProperty('--word-duration', `${word.duration || 300}ms`);
+                                  wordRef.classList.toggle('word-active', progress > 0 && progress < 1);
+                                  wordRef.classList.toggle('word-done', progress >= 1);
                                 }
                               });
                               return (
-                                <span ref={wordRef!} class="word-bg">
+                                <span
+                                  class="word-bg"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    _ytAPI?.seekTo((word.timeInMs + 10) / 1000);
+                                  }}
+                                  ref={(el) => { wordRef = el; }}
+                                  style={{ cursor: 'pointer' }}
+                                >
                                   <yt-formatted-string
-                                    text={{ runs: [{ text: `${word.word} ` }] }}
+                                    text={{ runs: [{ text: wordTexts()[globalIndex] }] }}
                                   />
                                 </span>
                               );

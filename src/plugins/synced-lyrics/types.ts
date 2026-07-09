@@ -1,9 +1,19 @@
 import type { ProviderName } from './providers';
 import type { SongInfo } from '@/providers/song-info';
 
+export type ProviderResolution = 'SÍLABA' | 'PALAVRA' | 'LINHA';
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  resolution: ProviderResolution;
+  enabled: boolean;
+}
+
 export type SyncedLyricsPluginConfig = {
   enabled: boolean;
   preferredProvider?: ProviderName;
+  providersOrder?: ProviderConfig[];
   preciseTiming: boolean;
   showTimeCodes: boolean;
   defaultTextString: string | string[];

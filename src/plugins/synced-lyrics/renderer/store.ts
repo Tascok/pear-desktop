@@ -1,4 +1,4 @@
-import { createMemo, runWithOwner } from 'solid-js';
+import { createMemo, createSignal, runWithOwner } from 'solid-js';
 import { createStore } from 'solid-js/store';
 
 import { getSongInfo } from '@/providers/song-info-front';
@@ -12,8 +12,10 @@ import {
 } from '../providers';
 import { providers } from '../providers/renderer';
 
-import type { LyricProvider } from '../types';
+import type { LyricProvider, SyncedLyricsPluginConfig } from '../types';
 import type { SongInfo } from '@/providers/song-info';
+
+export const [config, setConfig] = createSignal<SyncedLyricsPluginConfig | null>(null);
 
 type LyricsStore = {
   provider: ProviderName;
@@ -45,6 +47,71 @@ export const currentLyrics = runWithOwner(reactiveOwner, () =>
   }),
 )!;
 
+export const selectBestProvider = () => {
+  const cfg = config();
+  const order = cfg?.providersOrder;
+  if (!order || order.length === 0) {
+    const bias = (p: ProviderName) =>
+      (lyricsStore.lyrics[p]?.state === 'done' ? 1 : -1) +
+      (lyricsStore.lyrics[p]?.data?.lines?.length ? 2 : -1) +
+      (lyricsStore.lyrics[p]?.data?.lines?.some((l) => l.words && l.words.length > 0) ? 3 : -1) +
+      (lyricsStore.lyrics[p]?.data?.lyrics ? 1 : -1);
+
+    const sorted = [...providerNames].sort((a, b) => bias(b) - bias(a));
+    setLyricsStore('provider', sorted[0]);
+    return;
+  }
+
+  // 1. First choice: active provider in list that is done and has word-level data (lines with words array)
+  for (const entry of order) {
+    if (!entry.enabled) continue;
+    const providerState = lyricsStore.lyrics[entry.id as ProviderName];
+    if (
+      providerState &&
+      providerState.state === 'done' &&
+      providerState.data?.lines?.length &&
+      providerState.data.lines.some((l) => l.words && l.words.length > 0)
+    ) {
+      setLyricsStore('provider', entry.id as ProviderName);
+      return;
+    }
+  }
+
+  // 2. Second choice: active provider in list that is done and has lines/lyrics (line-level fallback)
+  for (const entry of order) {
+    if (!entry.enabled) continue;
+    const providerState = lyricsStore.lyrics[entry.id as ProviderName];
+    if (
+      providerState &&
+      providerState.state === 'done' &&
+      (providerState.data?.lines?.length || providerState.data?.lyrics)
+    ) {
+      setLyricsStore('provider', entry.id as ProviderName);
+      return;
+    }
+  }
+
+  // 3. Third choice: first active provider in list that is still fetching
+  for (const entry of order) {
+    if (!entry.enabled) continue;
+    const providerState = lyricsStore.lyrics[entry.id as ProviderName];
+    if (providerState && providerState.state === 'fetching') {
+      setLyricsStore('provider', entry.id as ProviderName);
+      return;
+    }
+  }
+
+  // 4. Fourth choice: fallback to first enabled provider
+  for (const entry of order) {
+    if (entry.enabled) {
+      setLyricsStore('provider', entry.id as ProviderName);
+      return;
+    }
+  }
+
+  setLyricsStore('provider', providerNames[0]);
+};
+
 type VideoId = string;
 
 type SearchCacheData = Record<ProviderName, ProviderState>;
@@ -53,7 +120,6 @@ interface SearchCache {
   data: SearchCacheData;
 }
 
-// TODO: Maybe use localStorage for the cache.
 const searchCache = new Map<VideoId, SearchCache>();
 export const fetchLyrics = (info: SongInfo) => {
   if (searchCache.has(info.videoId)) {
@@ -68,9 +134,9 @@ export const fetchLyrics = (info: SongInfo) => {
 
     if (getSongInfo().videoId === info.videoId) {
       setLyricsStore('lyrics', () => {
-        // weird bug with solid-js
         return JSON.parse(JSON.stringify(cache.data)) as typeof cache.data;
       });
+      selectBestProvider();
     }
 
     return;
@@ -84,14 +150,13 @@ export const fetchLyrics = (info: SongInfo) => {
   searchCache.set(info.videoId, cache);
   if (getSongInfo().videoId === info.videoId) {
     setLyricsStore('lyrics', () => {
-      // weird bug with solid-js
       return JSON.parse(JSON.stringify(cache.data)) as typeof cache.data;
     });
+    selectBestProvider();
   }
 
   const tasks: Promise<void>[] = [];
 
-  // prettier-ignore
   for (
     const [providerName, provider] of Object.entries(providers) as [
     ProviderName,
@@ -118,6 +183,7 @@ export const fetchLyrics = (info: SongInfo) => {
                 },
               };
             });
+            selectBestProvider();
           }
         })
         .catch((error: Error) => {
@@ -133,6 +199,7 @@ export const fetchLyrics = (info: SongInfo) => {
                 [providerName]: { state: 'error', error, data: null },
               };
             });
+            selectBestProvider();
           }
         }),
     );
@@ -167,6 +234,7 @@ export const retrySearch = (provider: ProviderName, info: SongInfo) => {
           [provider]: { state: 'done', data: res, error: null },
         };
       });
+      selectBestProvider();
     })
     .catch((error) => {
       setLyricsStore('lyrics', (old) => {
@@ -175,5 +243,6 @@ export const retrySearch = (provider: ProviderName, info: SongInfo) => {
           [provider]: { state: 'error', data: null, error },
         };
       });
+      selectBestProvider();
     });
 };

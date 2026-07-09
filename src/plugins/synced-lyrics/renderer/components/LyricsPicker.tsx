@@ -33,8 +33,8 @@ import {
 } from '../../providers';
 import { _ytAPI } from '../index';
 import { reactiveOwner } from '../reactive-root';
-import { config } from '../renderer';
-import { currentLyrics, lyricsStore, setLyricsStore } from '../store';
+import { setIsSettingsOpen } from '../renderer';
+import { config, currentLyrics, lyricsStore, setLyricsStore } from '../store';
 
 import type { PlayerAPIEvents } from '@/types/player-api-events';
 
@@ -56,17 +56,20 @@ const shouldSwitchProvider = (providerData: ProviderState) => {
   );
 };
 
-const providerBias = (p: ProviderName) =>
-  (lyricsStore.lyrics[p].state === 'done' ? 1 : -1) +
-  (lyricsStore.lyrics[p].data?.lines?.length ? 2 : -1) +
-  (lyricsStore.lyrics[p].data?.lines?.length && p === ProviderNames.YTMusic
-    ? 1
-    : 0) +
-  (lyricsStore.lyrics[p].data?.lyrics ? 1 : -1);
+const providerBias = (p: ProviderName) => {
+  const item = lyricsStore.lyrics[p];
+  if (!item) return -100;
+  return (
+    (item.state === 'done' ? 1 : -1) +
+    (item.data?.lines?.length ? 2 : -1) +
+    (item.data?.lines?.length && p === ProviderNames.YTMusic ? 1 : 0) +
+    (item.data?.lyrics ? 1 : -1)
+  );
+};
 
 const pickBestProvider = () => {
   const preferred = config()?.preferredProvider;
-  if (preferred) {
+  if (preferred && lyricsStore.lyrics[preferred]) {
     const data = lyricsStore.lyrics[preferred].data;
     if (Array.isArray(data?.lines) || data?.lyrics) {
       return { provider: preferred, force: true };
@@ -218,7 +221,7 @@ export const LyricsPicker = (props: {
                   <Match
                     when={
                       // prettier-ignore
-                      currentLyrics().state === 'fetching'
+                      currentLyrics()?.state === 'fetching'
                     }
                   >
                     <tp-yt-paper-spinner-lite
@@ -228,7 +231,7 @@ export const LyricsPicker = (props: {
                       tabindex="-1"
                     />
                   </Match>
-                  <Match when={currentLyrics().state === 'error'}>
+                  <Match when={currentLyrics()?.state === 'error'}>
                     <LitElementWrapper
                       elementClass={IconError}
                       props={{ style: { padding: '5px', scale: '0.8' } }}
@@ -236,9 +239,9 @@ export const LyricsPicker = (props: {
                   </Match>
                   <Match
                     when={
-                      currentLyrics().state === 'done' &&
-                      (currentLyrics().data?.lines ||
-                        currentLyrics().data?.lyrics)
+                      currentLyrics()?.state === 'done' &&
+                      (currentLyrics()?.data?.lines ||
+                        currentLyrics()?.data?.lyrics)
                     }
                   >
                     <LitElementWrapper
@@ -248,9 +251,9 @@ export const LyricsPicker = (props: {
                   </Match>
                   <Match
                     when={
-                      currentLyrics().state === 'done' &&
-                      !currentLyrics().data?.lines &&
-                      !currentLyrics().data?.lyrics
+                      currentLyrics()?.state === 'done' &&
+                      !currentLyrics()?.data?.lines &&
+                      !currentLyrics()?.data?.lyrics
                     }
                   >
                     <LitElementWrapper
@@ -293,7 +296,7 @@ export const LyricsPicker = (props: {
         </ul>
       </div>
 
-      <div class="lyrics-picker-left">
+      <div class="lyrics-picker-right" style={{ 'align-items': 'center', 'display': 'flex', 'gap': '8px' }}>
         <mdui-button-icon>
           <LitElementWrapper
             elementClass={IconChevronRight}
@@ -304,6 +307,16 @@ export const LyricsPicker = (props: {
             }}
           />
         </mdui-button-icon>
+        <button
+          class="lyrics-settings-btn"
+          onClick={() => setIsSettingsOpen(true)}
+          title="Configuração de Provedores"
+          type="button"
+        >
+          <svg fill="currentColor" height="20" viewBox="0 -960 960 960" width="20" xmlns="http://www.w3.org/2000/svg">
+            <path d="m370-80-16-128q-19-5-38.5-15.5T279-247l-120 50-100-173 102-76q-2-10-2-20t2-20l-102-76 100-173 120 50q17-14 36.5-24.5T354-800l16-128h200l16 128q19 5 38.5 15.5T681-713l120-50 100 173-102 76q2 10 2 20t-2 20l102 76-100 173-120-50q-17 14-36.5 24.5T606-160l-16 128H370Zm110-280q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/>
+          </svg>
+        </button>
       </div>
     </div>
   );

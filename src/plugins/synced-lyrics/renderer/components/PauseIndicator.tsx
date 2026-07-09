@@ -1,4 +1,5 @@
 import { createMemo } from 'solid-js';
+
 import { currentTime } from '../renderer';
 
 interface PauseIndicatorProps {
@@ -28,9 +29,9 @@ export const PauseIndicator = (props: PauseIndicatorProps) => {
 
   return (
     <div class={`pause-indicator pause-${state()}`}>
-      <span class="pause-dot"></span>
-      <span class="pause-dot"></span>
-      <span class="pause-dot"></span>
+      <span class="pause-dot" />
+      <span class="pause-dot" />
+      <span class="pause-dot" />
     </div>
   );
 };

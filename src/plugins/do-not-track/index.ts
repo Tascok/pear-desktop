@@ -96,7 +96,7 @@ export default createPlugin({
       // and the request is cancelled if ANY listener cancels it
       session.webRequest.setResolver('onBeforeRequest', (listeners) => {
         return Promise.all(
-          listeners.map((l) => l.apply()),
+          listeners.map((l) => Promise.resolve(l.apply())),
         ).then((results) => {
           // Merge: if any listener cancels, cancel; keep redirectURL if set
           const merged: Electron.CallbackResponse = { cancel: false };

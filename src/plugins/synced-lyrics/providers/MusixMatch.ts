@@ -6,7 +6,11 @@ import { netFetch } from '../renderer';
 import type { LyricProvider, LyricResult, SearchSongInfo } from '../types';
 
 export class MusixMatch implements LyricProvider {
-  name = 'MusixMatch';
+  constructor(
+    public name: string = 'MusixMatch',
+    private resolution: 'word' | 'line' = 'word',
+  ) {}
+
   baseUrl = 'https://www.musixmatch.com/';
 
   private api: MusixMatchAPI | undefined;
@@ -45,6 +49,7 @@ export class MusixMatch implements LyricProvider {
         ? LRC.parse(subtitle.subtitle.subtitle_body).lines.map((l) => ({
             ...l,
             status: 'upcoming' as const,
+            words: this.resolution === 'line' ? undefined : l.words,
           }))
         : undefined,
       lyrics: lyrics,

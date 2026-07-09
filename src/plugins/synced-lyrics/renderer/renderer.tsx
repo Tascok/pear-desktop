@@ -1,6 +1,8 @@
 import {
   createEffect,
+  createMemo,
   createSignal,
+  For,
   onCleanup,
   onMount,
   runWithOwner,
@@ -18,15 +20,17 @@ import {
   PauseIndicator,
 } from './components';
 import { LyricsPicker } from './components/LyricsPicker';
+import { saveConfig } from './index';
 import { reactiveOwner } from './reactive-root';
-import { currentLyrics } from './store';
+import { config, currentLyrics, setConfig } from './store';
 import { selectors } from './utils';
 
-import type { LineLyrics, SyncedLyricsPluginConfig } from '../types';
+import type { LineLyrics } from '../types';
+
+export { config, setConfig };
 
 export const [isVisible, setIsVisible] = createSignal<boolean>(false);
-export const [config, setConfig] =
-  createSignal<SyncedLyricsPluginConfig | null>(null);
+export const [isSettingsOpen, setIsSettingsOpen] = createSignal<boolean>(false);
 
 runWithOwner(reactiveOwner, () => {
   createEffect(() => {
@@ -163,6 +167,48 @@ type LyricsRendererChild =
 const lyricsPicker: LyricsRendererChild = { kind: 'LyricsPicker' };
 
 export const [currentTime, setCurrentTime] = createSignal<number>(-1);
+export const [currentIndex, setCurrentIndex] = createSignal<number>(0);
+
+let activeScrollAnimationId: number | null = null;
+
+function animateScroll(element: HTMLElement, target: number, duration = 900) {
+  if (activeScrollAnimationId !== null) {
+    cancelAnimationFrame(activeScrollAnimationId);
+  }
+
+  const start = element.scrollTop;
+  const change = target - start;
+
+  if (Math.abs(change) < 2) {
+    element.scrollTop = target;
+    return;
+  }
+
+  const startTime = performance.now();
+
+  const animate = (time: number) => {
+    const elapsed = time - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Elastic easeOut for custom bounce with soft stop
+    let ease = 1;
+    if (progress < 1) {
+      const p = progress;
+      ease = (Math.pow(2, -10 * p) * Math.sin(((p - 0.075) * (2 * Math.PI)) / 0.3)) + 1;
+    }
+
+    element.scrollTop = start + (change * ease);
+
+    if (progress < 1) {
+      activeScrollAnimationId = requestAnimationFrame(animate);
+    } else {
+      activeScrollAnimationId = null;
+    }
+  };
+
+  activeScrollAnimationId = requestAnimationFrame(animate);
+}
+
 export const LyricsRenderer = () => {
   const [scroller, setScroller] = createSignal<VirtualizerHandle>();
   const [stickyRef, setStickRef] = createSignal<HTMLElement | null>(null);
@@ -296,20 +342,62 @@ export const LyricsRenderer = () => {
     });
   });
 
+  const scrollIndex = createMemo(() => {
+    const time = currentTime();
+    const data = currentLyrics()?.data;
+    if (!data || !data.lines || data.lines.length === 0) return -1;
+    
+    // Find if we are currently inside a line
+    for (let i = 0; i < data.lines.length; i++) {
+      const line = data.lines[i];
+      if (time >= line.timeInMs && time < line.timeInMs + line.duration) {
+        return i;
+      }
+    }
+    
+    // If not inside any line, find the next line
+    let nextLineIdx = -1;
+    for (let i = 0; i < data.lines.length; i++) {
+      if (data.lines[i].timeInMs > time) {
+        nextLineIdx = i;
+        break;
+      }
+    }
+    
+    if (nextLineIdx === -1) {
+      return data.lines.length - 1;
+    }
+    
+    if (nextLineIdx === 0) {
+      const firstLine = data.lines[0];
+      if (firstLine.timeInMs - time <= 1500) {
+        return 0;
+      }
+      return -1;
+    }
+    
+    const nextLine = data.lines[nextLineIdx];
+    if (nextLine.timeInMs - time <= 1500) {
+      return nextLineIdx;
+    }
+    
+    return nextLineIdx - 1;
+  });
+
   const [statuses, setStatuses] = createSignal<
     ('previous' | 'current' | 'upcoming')[]
   >([]);
   createEffect(() => {
-    const time = currentTime();
     const data = currentLyrics()?.data;
+    const activeIdx = scrollIndex();
 
     if (!data || !data.lines) return setStatuses([]);
 
     const previous = untrack(statuses);
-    const current = data.lines.map((line) => {
-      if (line.timeInMs >= time) return 'upcoming';
-      if (time - line.timeInMs >= line.duration) return 'previous';
-      return 'current';
+    const current = data.lines.map((_, idx) => {
+      if (idx === activeIdx) return 'current';
+      if (idx < activeIdx) return 'previous';
+      return 'upcoming';
     });
 
     if (previous.length !== current.length) return setStatuses(current);
@@ -319,11 +407,10 @@ export const LyricsRenderer = () => {
     return;
   });
 
-  const [currentIndex, setCurrentIndex] = createSignal(0);
   createEffect(() => {
-    const index = statuses().findIndex((status) => status === 'current');
-    if (index === -1) return;
-    setCurrentIndex(index);
+    const activeIdx = scrollIndex();
+    if (activeIdx === -1) return;
+    setCurrentIndex(activeIdx);
   });
 
   createEffect(() => {
@@ -331,7 +418,7 @@ export const LyricsRenderer = () => {
     const lineIdx = currentIndex(); // index of current line in original data.lines array
     const childList = children();
 
-    if (!scroller() || !current.data?.lines) return;
+    if (!scroller() || !current || !current.data?.lines) return;
 
     // Find the actual index in the VList data array ([lyricsPicker, ...children()])
     // that corresponds to the current line
@@ -347,55 +434,163 @@ export const LyricsRenderer = () => {
     }
 
     if (found) {
-      scroller()!.scrollToIndex(vlistIndex, {
-        smooth: true,
-        align: 'center',
-      });
+      const container = document.querySelector('.synced-lyrics-vlist') as HTMLElement;
+      if (container) {
+        const startScrollTop = container.scrollTop;
+        scroller()!.scrollToIndex(vlistIndex, {
+          align: 'center',
+        });
+        const targetScrollTop = container.scrollTop;
+        container.scrollTop = startScrollTop;
+        
+        animateScroll(container, targetScrollTop);
+      } else {
+        scroller()!.scrollToIndex(vlistIndex, {
+          smooth: true,
+          align: 'center',
+        });
+      }
     }
   });
 
   return (
     <Show when={isVisible()}>
-      <VList
-        {...{
-          ref: setScroller,
-          style: { 'scrollbar-width': 'none' },
-          class: 'synced-lyrics-vlist',
-          keepMounted: [0],
-          overscan: 4,
-        }}
-        data={[lyricsPicker, ...children()]}
-      >
-        {(props, idx) => {
-          if (typeof props === 'undefined') return null;
-          switch (props.kind) {
-            case 'LyricsPicker':
-              return <LyricsPicker setStickRef={setStickRef} />;
-            case 'Error':
-              return <ErrorDisplay {...props} />;
-            case 'LoadingKaomoji':
-              return <LoadingKaomoji />;
-            case 'NotFoundKaomoji':
-              return <NotFoundKaomoji />;
-            case 'SyncedLine': {
-              return (
-                <SyncedLine
-                  {...props}
-                  index={idx()}
-                  scroller={scroller()!}
-                  status={statuses()[props.lineIndex]}
-                />
-              );
+      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+        <VList
+          {...{
+            ref: setScroller,
+            style: { 'scrollbar-width': 'none', 'z-index': 1, 'background': 'transparent' },
+            class: 'synced-lyrics-vlist',
+            keepMounted: [0],
+            overscan: 4,
+          }}
+          data={[lyricsPicker, ...children()]}
+        >
+          {(props, idx) => {
+            if (typeof props === 'undefined') return null;
+            switch (props.kind) {
+              case 'LyricsPicker':
+                return <LyricsPicker setStickRef={setStickRef} />;
+              case 'Error':
+                return <ErrorDisplay {...props} />;
+              case 'LoadingKaomoji':
+                return <LoadingKaomoji />;
+              case 'NotFoundKaomoji':
+                return <NotFoundKaomoji />;
+              case 'SyncedLine': {
+                return (
+                  <SyncedLine
+                    {...props}
+                    index={idx()}
+                    scroller={scroller()!}
+                    status={statuses()[props.lineIndex]}
+                  />
+                );
+              }
+              case 'PlainLine': {
+                return <PlainLyrics {...props} />;
+              }
+              case 'PauseIndicator': {
+                return <PauseIndicator {...props} />;
+              }
             }
-            case 'PlainLine': {
-              return <PlainLyrics {...props} />;
-            }
-            case 'PauseIndicator': {
-              return <PauseIndicator {...props} />;
-            }
-          }
-        }}
-      </VList>
+          }}
+        </VList>
+
+        <Show when={isSettingsOpen()}>
+          <div class="lyrics-settings-backdrop" onClick={() => setIsSettingsOpen(false)}>
+            <div class="lyrics-settings-modal" onClick={(e) => e.stopPropagation()}>
+              <div class="lyrics-settings-header">
+                <h3>Provedores de Letras</h3>
+                <button class="lyrics-settings-close-btn" onClick={() => setIsSettingsOpen(false)}>
+                  &times;
+                </button>
+              </div>
+              
+              <p class="lyrics-settings-help">
+                Arraste para reordenar a prioridade. Ative ou desative cada provedor nos seletores.
+              </p>
+
+              <div class="lyrics-providers-list">
+                <For each={config()?.providersOrder || []}>
+                  {(entry, index) => {
+                    const [isDragging, setIsDragging] = createSignal(false);
+                    
+                    const handleDragStart = (e: DragEvent) => {
+                      e.dataTransfer?.setData('text/plain', String(index()));
+                      setIsDragging(true);
+                    };
+
+                    const handleDragOver = (e: DragEvent) => {
+                      e.preventDefault();
+                    };
+
+                    const handleDrop = (e: DragEvent) => {
+                      e.preventDefault();
+                      const fromIndexStr = e.dataTransfer?.getData('text/plain');
+                      if (fromIndexStr === undefined || fromIndexStr === '') return;
+                      const fromIndex = parseInt(fromIndexStr, 10);
+                      const toIndex = index();
+                      if (fromIndex === toIndex) return;
+
+                      const list = [...(config()?.providersOrder || [])];
+                      const [draggedItem] = list.splice(fromIndex, 1);
+                      list.splice(toIndex, 0, draggedItem);
+                      saveConfig({ providersOrder: list });
+                    };
+
+                    const handleDragEnd = () => {
+                      setIsDragging(false);
+                    };
+
+                    const toggleProvider = () => {
+                      const list = (config()?.providersOrder || []).map((p, idx) => {
+                        if (idx === index()) {
+                          return { ...p, enabled: !p.enabled };
+                        }
+                        return p;
+                      });
+                      saveConfig({ providersOrder: list });
+                    };
+
+                    return (
+                      <div
+                        class={`lyrics-provider-card ${isDragging() ? 'dragging' : ''}`}
+                        data-enabled={entry.enabled ? 'true' : 'false'}
+                        draggable={true}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                        onDragStart={handleDragStart}
+                        onDrop={handleDrop}
+                      >
+                        <div class="lyrics-card-drag-handle">
+                          ⠿
+                        </div>
+                        
+                        <div class="lyrics-card-info">
+                          <span class="lyrics-card-name">{entry.name}</span>
+                          <span class={`lyrics-card-badge res-${entry.resolution.toLowerCase()}`}>
+                            {entry.resolution}
+                          </span>
+                        </div>
+
+                        <label class="lyrics-card-switch">
+                          <input
+                            checked={entry.enabled}
+                            onChange={toggleProvider}
+                            type="checkbox"
+                          />
+                          <span class="lyrics-card-slider" />
+                        </label>
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            </div>
+          </div>
+        </Show>
+      </div>
     </Show>
   );
 };

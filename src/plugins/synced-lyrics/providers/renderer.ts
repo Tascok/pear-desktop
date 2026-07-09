@@ -1,15 +1,25 @@
+import { BetterLyrics, BetterLyricsPortato, BiniLyrics, MusixMatchWord } from './BetterLyricsUnified';
+import { BetterLyricsUnison } from './BetterLyricsUnison';
 import { ProviderNames } from './index';
-import { BetterLyrics } from './BetterLyrics';
 import { LRCLib } from './LRCLib';
 import { LyricsGenius } from './LyricsGenius';
-import { MusixMatch } from './MusixMatch';
+import { LyricsPlus } from './LyricsPlus';
 import { YTMusic } from './YTMusic';
 
 export const providers = {
+  // Syllable/Word providers
+  [ProviderNames.BetterLyrics]: new BetterLyrics('BetterLyrics', 'syllable'),
+  [ProviderNames.BetterLyricsPortato]: new BetterLyricsPortato(),
+  [ProviderNames.BiniLyrics]: new BiniLyrics('BiniLyrics', 'syllable'),
+  [ProviderNames.MusixMatchWord]: new MusixMatchWord(),
+  [ProviderNames.LyricsPlus]: new LyricsPlus('LyricsPlus', 'syllable'),
+  [ProviderNames.BetterLyricsUnison]: new BetterLyricsUnison('BetterLyricsUnison', 'syllable'),
+
+  // Line providers (synced LRC)
   [ProviderNames.YTMusic]: new YTMusic(),
+  [ProviderNames.BetterLyricsUnisonLine]: new BetterLyricsUnison('BetterLyricsUnisonLine', 'line'),
   [ProviderNames.LRCLib]: new LRCLib(),
-  [ProviderNames.MusixMatch]: new MusixMatch(),
+
+  // Plain/unsynced fallback
   [ProviderNames.LyricsGenius]: new LyricsGenius(),
-  [ProviderNames.BetterLyrics]: new BetterLyrics(),
-  // [ProviderNames.Megalobiz]: new Megalobiz(), // Disabled because it is too unstable and slow
 } as const;

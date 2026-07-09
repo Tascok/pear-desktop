@@ -42,7 +42,8 @@ function parseTTMLTime(time: string): number {
     if (frac.length === 2) frac += '0';
     while (frac.length < 3) frac += '0';
     const ms = parseInt(frac.slice(0, 3), 10);
-    return (minutes * 60 + seconds) * 1000 + ms;
+    const totalSeconds = (minutes * 60) + seconds;
+    return (totalSeconds * 1000) + ms;
   }
 
   // HH:MM:SS.mmm (3-digit fractional = milliseconds)
@@ -55,7 +56,9 @@ function parseTTMLTime(time: string): number {
     if (frac.length === 2) frac += '0';
     while (frac.length < 3) frac += '0';
     const ms = parseInt(frac.slice(0, 3), 10);
-    return ((hours * 60 + minutes) * 60 + seconds) * 1000 + ms;
+    const totalMinutes = (hours * 60) + minutes;
+    const totalSeconds = (totalMinutes * 60) + seconds;
+    return (totalSeconds * 1000) + ms;
   }
 
   // HH:MM:SS (no fractional)
@@ -64,7 +67,9 @@ function parseTTMLTime(time: string): number {
     const hours = parseInt(hhmm[1], 10);
     const minutes = parseInt(hhmm[2], 10);
     const seconds = parseInt(hhmm[3], 10);
-    return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+    const totalMinutes = (hours * 60) + minutes;
+    const totalSeconds = (totalMinutes * 60) + seconds;
+    return totalSeconds * 1000;
   }
 
   // MM:SS (no fractional)
@@ -72,7 +77,8 @@ function parseTTMLTime(time: string): number {
   if (msOnly) {
     const minutes = parseInt(msOnly[1], 10);
     const seconds = parseInt(msOnly[2], 10);
-    return (minutes * 60 + seconds) * 1000;
+    const totalSeconds = (minutes * 60) + seconds;
+    return totalSeconds * 1000;
   }
 
   // Plain seconds (SS.mmm or SS)
@@ -314,7 +320,7 @@ export const TTML = {
         const lineDuration = endMs - beginMs || 0;
         const wordDuration = arr.length > 0 ? lineDuration / arr.length : 300;
         return {
-          timeInMs: beginMs + i * wordDuration,
+          timeInMs: beginMs + (i * wordDuration),
           word: w,
           duration: wordDuration,
           isBackground: undefined,
