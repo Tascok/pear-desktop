@@ -50,6 +50,7 @@ export const currentLyrics = runWithOwner(reactiveOwner, () =>
 export const selectBestProvider = () => {
   const cfg = config();
   const order = cfg?.providersOrder;
+  console.log('[Lyrics] selectBestProvider called');
   if (!order || order.length === 0) {
     const bias = (p: ProviderName) =>
       (lyricsStore.lyrics[p]?.state === 'done' ? 1 : -1) +
@@ -110,6 +111,7 @@ export const selectBestProvider = () => {
   }
 
   setLyricsStore('provider', providerNames[0]);
+  console.log('[Lyrics] Selected: ' + lyricsStore.provider);
 };
 
 type VideoId = string;
@@ -133,8 +135,11 @@ const evictCacheIfNeeded = () => {
 };
 
 export const fetchLyrics = (info: SongInfo) => {
+  console.log('[Lyrics] fetchLyrics called: ' + info.videoId + ' "' + info.title + '" by ' + info.artist);
+
   if (searchCache.has(info.videoId)) {
     const cache = searchCache.get(info.videoId)!;
+    console.log('[Lyrics] Cache HIT for ' + info.videoId + ', state=' + cache.state);
 
     if (cache.state === 'loading') {
       // Add delay to prevent stacking timeouts when songs change rapidly
@@ -153,6 +158,7 @@ export const fetchLyrics = (info: SongInfo) => {
 
     return;
   }
+  console.log('[Lyrics] Cache MISS for ' + info.videoId + ', starting fresh fetch');
 
   const cache: SearchCache = {
     state: 'loading',
@@ -185,6 +191,7 @@ export const fetchLyrics = (info: SongInfo) => {
         .then((res) => {
           pCache.state = 'done';
           pCache.data = res;
+          console.log('[Lyrics] Provider ' + providerName + ' resolved: ' + (res?.lines?.length ?? res?.lyrics ? 'has data' : 'null'));
 
           if (getSongInfo().videoId === info.videoId) {
             setLyricsStore('lyrics', (old) => {
@@ -203,8 +210,7 @@ export const fetchLyrics = (info: SongInfo) => {
         .catch((error: Error) => {
           pCache.state = 'error';
           pCache.error = error;
-
-          console.error(error);
+          console.error('[Lyrics] Provider ' + providerName + ' failed:', error.message);
 
           if (getSongInfo().videoId === info.videoId) {
             setLyricsStore('lyrics', (old) => {
@@ -219,10 +225,11 @@ export const fetchLyrics = (info: SongInfo) => {
     );
   }
 
-  Promise.allSettled(tasks).then(() => {
+  Promise.allSettled(tasks).then((results) => {
     cache.state = 'done';
     searchCache.set(info.videoId, cache);
     evictCacheIfNeeded();
+    console.log('[Lyrics] All providers settled:', results.map((r) => r.status));
   });
 };
 

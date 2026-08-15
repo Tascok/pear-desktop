@@ -203,7 +203,7 @@ export function updateBackdropColors(imgSrc: string) {
         tempCanvas.width = 4;
         tempCanvas.height = 4;
       }
-      const ctx = tempCanvas.getContext('2d');
+      const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     ctx.drawImage(img, 0, 0, 4, 4);
