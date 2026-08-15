@@ -18,8 +18,17 @@ let animationFrameId: number | null = null;
 let beatValue = 0;
 let timeValue = 0;
 
+// Cached uniform locations — getUniformLocation is expensive, call once at init
+let uResolution: WebGLUniformLocation | null = null;
+let uTime: WebGLUniformLocation | null = null;
+let uBeat: WebGLUniformLocation | null = null;
+const uColorLocs: WebGLUniformLocation[] = [];
+
 // Debounce to prevent multiple image decodes when songs change rapidly
 let colorDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Reusable temp canvas — avoid allocating a new one on every color update
+let tempCanvas: HTMLCanvasElement | null = null;
 
 const vertexShaderSource = `
   attribute vec2 position;
@@ -98,6 +107,16 @@ export function initBackdrop(canvas: HTMLCanvasElement) {
 
   const positionAttributeLocation = gl.getAttribLocation(program, 'position');
   const positionBuffer = gl.createBuffer();
+
+  // Cache uniform locations once at init — getUniformLocation is expensive per-frame
+  uResolution = gl.getUniformLocation(program, 'u_resolution');
+  uTime = gl.getUniformLocation(program, 'u_time');
+  uBeat = gl.getUniformLocation(program, 'u_beat');
+  uColorLocs.length = 0;
+  for (let i = 0; i < 4; i++) {
+    uColorLocs.push(gl.getUniformLocation(program, `u_colors[${i}]`)!);
+  }
+
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
   const positions = new Float32Array([
@@ -146,19 +165,13 @@ export function initBackdrop(canvas: HTMLCanvasElement) {
 
     timeValue += 0.05;
 
-    // Set uniforms
-    const uResolution = gl.getUniformLocation(program, 'u_resolution');
-    const uTime = gl.getUniformLocation(program, 'u_time');
-    const uBeat = gl.getUniformLocation(program, 'u_beat');
-
+    // Set uniforms using pre-cached locations
     gl.uniform2f(uResolution, canvas.width, canvas.height);
     gl.uniform1f(uTime, timeValue);
     gl.uniform1f(uBeat, beatValue);
 
-    // Set colors uniform
     for (let i = 0; i < 4; i++) {
-      const uColorLoc = gl.getUniformLocation(program, `u_colors[${i}]`);
-      gl.uniform3f(uColorLoc, currentColors[i][0], currentColors[i][1], currentColors[i][2]);
+      gl.uniform3f(uColorLocs[i], currentColors[i][0], currentColors[i][1], currentColors[i][2]);
     }
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -184,10 +197,13 @@ export function updateBackdropColors(imgSrc: string) {
     img.crossOrigin = 'anonymous';
     img.src = imgSrc;
     img.onload = () => {
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = 4;
-    tempCanvas.height = 4;
-    const ctx = tempCanvas.getContext('2d');
+      // Reuse a single temp canvas instead of allocating a new one per song
+      if (!tempCanvas) {
+        tempCanvas = document.createElement('canvas');
+        tempCanvas.width = 4;
+        tempCanvas.height = 4;
+      }
+      const ctx = tempCanvas.getContext('2d');
     if (!ctx) return;
 
     ctx.drawImage(img, 0, 0, 4, 4);
@@ -225,10 +241,27 @@ export function triggerBackdropBeat() {
 }
 
 export function destroyBackdrop() {
+  if (colorDebounceTimer !== null) {
+    clearTimeout(colorDebounceTimer);
+    colorDebounceTimer = null;
+  }
+
   if (animationFrameId !== null) {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = null;
   }
+
+  // Properly dispose WebGL resources to prevent GPU memory leaks
+  if (gl && program) {
+    try { gl.deleteProgram(program); } catch { /* ignore */ }
+    program = null;
+  }
+  uResolution = null;
+  uTime = null;
+  uBeat = null;
+  uColorLocs.length = 0;
+
+  // Discard the reusable temp canvas so it can be recreated fresh next time
+  tempCanvas = null;
   gl = null;
-  program = null;
 }
