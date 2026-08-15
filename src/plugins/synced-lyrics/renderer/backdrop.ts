@@ -18,6 +18,9 @@ let animationFrameId: number | null = null;
 let beatValue = 0;
 let timeValue = 0;
 
+// Debounce to prevent multiple image decodes when songs change rapidly
+let colorDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 const vertexShaderSource = `
   attribute vec2 position;
   void main() {
@@ -169,10 +172,18 @@ export function initBackdrop(canvas: HTMLCanvasElement) {
 export function updateBackdropColors(imgSrc: string) {
   if (!imgSrc) return;
 
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.src = imgSrc;
-  img.onload = () => {
+  // Debounce to prevent rapid successive image decodes when songs change quickly
+  if (colorDebounceTimer !== null) {
+    clearTimeout(colorDebounceTimer);
+  }
+
+  colorDebounceTimer = setTimeout(() => {
+    colorDebounceTimer = null;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imgSrc;
+    img.onload = () => {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = 4;
     tempCanvas.height = 4;
@@ -196,8 +207,8 @@ export function updateBackdropColors(imgSrc: string) {
     }
 
     targetColors = rgbColors.slice(0, 4);
-  };
-  img.onerror = () => {
+    };
+    img.onerror = () => {
     // default colors if loading fails
     targetColors = [
       [0.1, 0.1, 0.1],
@@ -206,6 +217,7 @@ export function updateBackdropColors(imgSrc: string) {
       [0.2, 0.2, 0.2],
     ];
   };
+}, 500);
 }
 
 export function triggerBackdropBeat() {

@@ -86,16 +86,20 @@ export const renderer = createRenderer<
     await this.videoDataChange();
   },
   async videoDataChange() {
-    if (!this.updateTimestampInterval) {
-      const tick = () => {
-        const video = document.querySelector('video');
-        if (video) {
-          setCurrentTime(video.currentTime * 1000);
-        }
-        this.updateTimestampInterval = requestAnimationFrame(tick);
-      };
-      this.updateTimestampInterval = requestAnimationFrame(tick);
+    // Cancel any previous RAF tick to prevent multiple loops running
+    if (this.updateTimestampInterval) {
+      cancelAnimationFrame(this.updateTimestampInterval as number);
+      this.updateTimestampInterval = undefined;
     }
+
+    const tick = () => {
+      const video = document.querySelector('video');
+      if (video) {
+        setCurrentTime(video.currentTime * 1000);
+      }
+      this.updateTimestampInterval = requestAnimationFrame(tick);
+    };
+    this.updateTimestampInterval = requestAnimationFrame(tick);
 
     // prettier-ignore
     this.observer ??= new MutationObserver(this.observerCallback);

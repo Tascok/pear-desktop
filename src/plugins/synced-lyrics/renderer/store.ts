@@ -120,15 +120,27 @@ interface SearchCache {
   data: SearchCacheData;
 }
 
+const MAX_CACHE_SIZE = 200;
 const searchCache = new Map<VideoId, SearchCache>();
+
+// Evict oldest entries when cache exceeds limit
+const evictCacheIfNeeded = () => {
+  if (searchCache.size <= MAX_CACHE_SIZE) return;
+  const keys = [...searchCache.keys()];
+  while (searchCache.size > MAX_CACHE_SIZE) {
+    searchCache.delete(keys.shift()!);
+  }
+};
+
 export const fetchLyrics = (info: SongInfo) => {
   if (searchCache.has(info.videoId)) {
     const cache = searchCache.get(info.videoId)!;
 
     if (cache.state === 'loading') {
+      // Add delay to prevent stacking timeouts when songs change rapidly
       setTimeout(() => {
         fetchLyrics(info);
-      });
+      }, 1000);
       return;
     }
 
@@ -154,6 +166,8 @@ export const fetchLyrics = (info: SongInfo) => {
     });
     selectBestProvider();
   }
+
+  evictCacheIfNeeded();
 
   const tasks: Promise<void>[] = [];
 
@@ -208,6 +222,7 @@ export const fetchLyrics = (info: SongInfo) => {
   Promise.allSettled(tasks).then(() => {
     cache.state = 'done';
     searchCache.set(info.videoId, cache);
+    evictCacheIfNeeded();
   });
 };
 
