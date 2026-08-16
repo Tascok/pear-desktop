@@ -166,6 +166,42 @@ const lyricsPicker: LyricsRendererChild = { kind: 'LyricsPicker' };
 export const [currentTime, setCurrentTime] = createSignal<number>(-1);
 export const [currentIndex, setCurrentIndex] = createSignal<number>(0);
 
+let activeScrollId: number | null = null;
+
+/** Smoothest practical easing — ease-out-expo (natural deceleration, no bounce) */
+function easeOutExpo(t: number): number {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+
+function animateScroll(element: HTMLElement, target: number) {
+  if (activeScrollId !== null) cancelAnimationFrame(activeScrollId);
+
+  const start = element.scrollTop;
+  const delta = target - start;
+
+  if (Math.abs(delta) < 0.5) {
+    element.scrollTop = target;
+    return;
+  }
+
+  // Distance-adaptive duration: ~50 ms per pixel, capped at 900 ms
+  const duration = Math.min(900, Math.max(250, Math.abs(delta) * 50));
+  const startTime = performance.now();
+
+  const step = (now: number) => {
+    const progress = Math.min((now - startTime) / duration, 1);
+    element.scrollTop = start + delta * easeOutExpo(progress);
+    if (progress < 1) {
+      activeScrollId = requestAnimationFrame(step);
+    } else {
+      element.scrollTop = target;
+      activeScrollId = null;
+    }
+  };
+
+  activeScrollId = requestAnimationFrame(step);
+}
+
 export const LyricsRenderer = () => {
   const [scroller, setScroller] = createSignal<VirtualizerHandle>();
   const [stickyRef, setStickRef] = createSignal<HTMLElement | null>(null);
@@ -397,16 +433,12 @@ export const LyricsRenderer = () => {
     if (found) {
       const container = document.querySelector('.synced-lyrics-vlist') as HTMLElement;
       if (container) {
-        // Pre-calculate target position without triggering scroll,
-        // then let CSS scroll-behavior:'smooth' animate natively
-        // on the compositor thread (no main-thread RAF jank).
+        // Save current position, get target from VList internal scroll, restore, then animate
         const startScrollTop = container.scrollTop;
         scroller()!.scrollToIndex(vlistIndex, { align: 'center' });
         const targetScrollTop = container.scrollTop;
-        container.scrollTop = startScrollTop; // preserve position, then animate
-        requestAnimationFrame(() => {
-          container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-        });
+        container.scrollTop = startScrollTop;
+        animateScroll(container, targetScrollTop);
       } else {
         console.warn('[Lyrics] .synced-lyrics-vlist not in DOM');
         scroller()!.scrollToIndex(vlistIndex, { align: 'center' });
