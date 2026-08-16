@@ -818,15 +818,14 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
   box-shadow: 0 1px 5px rgba(30, 144, 255, 0.4);
 }
 
-/* ─── Animated Artwork (bls-video) ─── */
-video#bls-video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  position: absolute;
+/* ─── Animated Artwork (bls-video mirror) ─── */
+#pear-animated-artwork {
+  position: fixed;
   top: 0;
   left: 0;
-  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 1;
   pointer-events: none;
 }

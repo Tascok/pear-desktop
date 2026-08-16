@@ -30,11 +30,14 @@ export const renderer = createRenderer<
     updateTimestampInterval?: NodeJS.Timeout | string | number;
     lyricsTabSelected: boolean;
     playerPageOpen: boolean;
+    _mainVideo?: HTMLVideoElement;
+    _mainVideoListenersAdded: boolean;
   },
   SyncedLyricsPluginConfig
 >({
   lyricsTabSelected: false,
   playerPageOpen: false,
+  _mainVideoListenersAdded: false,
 
   onConfigChange(newConfig) {
     setConfig(newConfig);
@@ -149,15 +152,31 @@ export const renderer = createRenderer<
     // only applies on the lyrics tab page, not on other screens.
     document.body.classList.add('has-synced-lyrics-bg');
 
-    // Detect and play bls-video (animated artwork from YouTube Music)
-    const initBlsVideo = () => {
-      const blsVideo = document.querySelector<HTMLMediaElement>('video#bls-video');
-      if (!blsVideo || blsVideo.dataset.pearHandled === '1') return;
-      blsVideo.dataset.pearHandled = '1';
-      (blsVideo as HTMLVideoElement).muted = true;
-      (blsVideo as HTMLVideoElement).playsInline = true;
-      blsVideo.loop = true;
-      blsVideo.pause();
+    // ─── Animated Artwork (bls-video) ───
+    // Mirror YouTube Music's #bls-video into our own <video> overlay,
+    // synced to the main player's play/pause state (same approach as
+    // the Better Lyrics extension).
+    const pearVideo = document.createElement('video');
+    pearVideo.id = 'pear-animated-artwork';
+    pearVideo.muted = true;
+    pearVideo.playsInline = true;
+    pearVideo.loop = true;
+    pearVideo.style.display = 'none';
+    document.body.appendChild(pearVideo);
+
+    const syncAnimatedArtwork = () => {
+      const blsVideo = document.querySelector<HTMLVideoElement>('video#bls-video');
+      if (!blsVideo) return;
+      const src = blsVideo.currentSrc || blsVideo.querySelector('source')?.src || '';
+      if (!src) return;
+      if (pearVideo.src !== src) {
+        pearVideo.src = src;
+        pearVideo.load();
+      }
+      const mainVideo = document.querySelector<HTMLVideoElement>('video');
+      const isPlaying = mainVideo ? !mainVideo.paused : false;
+      if (isPlaying && pearVideo.paused) void pearVideo.play().catch(() => {});
+      else if (!isPlaying && !pearVideo.paused) pearVideo.pause();
     };
 
     let blsObserver: MutationObserver | null = null;
@@ -168,12 +187,12 @@ export const renderer = createRenderer<
           if (m.addedNodes.length) {
             for (const node of m.addedNodes) {
               if (node instanceof Element && node.matches('video#bls-video')) {
-                initBlsVideo();
+                syncAnimatedArtwork();
                 return;
               }
               if (node instanceof HTMLElement) {
                 const v = node.querySelector('video#bls-video');
-                if (v) { initBlsVideo(); return; }
+                if (v) { syncAnimatedArtwork(); return; }
               }
             }
           }
@@ -189,10 +208,19 @@ export const renderer = createRenderer<
         triggerBackdropBeat();
       }
       setupBlsObserver();
-      if (document.querySelector('video#bls-video')) {
-        initBlsVideo();
-      }
+      syncWithMainPlayer();
+      syncAnimatedArtwork();
     });
+
+    // Sync animated artwork play/pause with the main player video
+    const syncWithMainPlayer = () => {
+      const mv = document.querySelector<HTMLVideoElement>('video');
+      if (!mv || this._mainVideoListenersAdded) return;
+      mv.addEventListener('play', syncAnimatedArtwork);
+      mv.addEventListener('pause', syncAnimatedArtwork);
+      this._mainVideoListenersAdded = true;
+      this._mainVideo = mv;
+    };
   },
 
   stop() {
@@ -207,6 +235,8 @@ export const renderer = createRenderer<
     if (canvas) {
       canvas.remove();
     }
+    const pearVideo = document.getElementById('pear-animated-artwork');
+    if (pearVideo) pearVideo.remove();
     document.body.classList.remove('has-synced-lyrics-bg', 'webgl-active');
     disposeReactiveRoot();
   },
