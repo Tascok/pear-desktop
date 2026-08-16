@@ -403,7 +403,6 @@ export const LyricsRenderer = () => {
     if (previous.length !== current.length) return setStatuses(current);
     if (previous.every((status, idx) => status === current[idx])) return;
 
-    console.log('[Lyrics] setStatuses → activeIdx=', activeIdx, 'len=', current.length);
     setStatuses(current);
     return;
   });
@@ -411,7 +410,6 @@ export const LyricsRenderer = () => {
   createEffect(() => {
     const activeIdx = scrollIndex();
     if (activeIdx === -1) return;
-    console.log('[Lyrics] setCurrentIndex →', activeIdx, 'time=', currentTime());
     setCurrentIndex(activeIdx);
   });
 
@@ -419,8 +417,6 @@ export const LyricsRenderer = () => {
     const current = currentLyrics();
     const lineIdx = currentIndex(); // index of current line in original data.lines array
     const childList = children();
-
-    console.log('[Lyrics] scroll effect → lineIdx=', lineIdx, 'children=', childList.length);
 
     if (!scroller() || !current || !current.data?.lines) return;
 
@@ -437,8 +433,6 @@ export const LyricsRenderer = () => {
       }
     }
 
-    console.log('[Lyrics] found=', found, 'vlistIndex=', vlistIndex);
-
     if (found) {
       const container = document.querySelector('.synced-lyrics-vlist') as HTMLElement;
       if (container) {
@@ -449,7 +443,6 @@ export const LyricsRenderer = () => {
         const targetScrollTop = container.scrollTop;
         container.scrollTop = startScrollTop;
 
-        console.log('[Lyrics] animating scroll:', Math.round(startScrollTop), '→', Math.round(targetScrollTop));
         animateScroll(container, targetScrollTop);
       } else {
         console.warn('[Lyrics] .synced-lyrics-vlist not in DOM, using smooth scroll');

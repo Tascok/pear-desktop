@@ -92,22 +92,15 @@ export const renderer = createRenderer<
       this.updateTimestampInterval = undefined;
     }
 
-    let lastLoggedTime = -1;
     const tick = () => {
       const video = document.querySelector('video');
       if (video) {
-        const timeMs = Math.round(video.currentTime * 1000);
-        if (timeMs !== lastLoggedTime) {
-          console.log('[Lyrics] RAF tick →', timeMs, 'ms');
-          lastLoggedTime = timeMs;
-        }
-        setCurrentTime(timeMs);
+        setCurrentTime(video.currentTime * 1000);
       } else {
         console.warn('[Lyrics] RAF tick: no <video> element found (skipping tick)');
       }
       this.updateTimestampInterval = requestAnimationFrame(tick);
     };
-    console.log('[Lyrics] RAF loop started');
     this.updateTimestampInterval = requestAnimationFrame(tick);
 
     // prettier-ignore
