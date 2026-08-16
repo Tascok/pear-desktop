@@ -153,7 +153,7 @@
   display: block;
   text-align: left;
   margin: var(--global-margin) 0;
-  transform-origin: 0 50%;
+  transform-origin: center center;
   filter: blur(0px);
   letter-spacing: -0.02em;
 
@@ -186,7 +186,7 @@
     -webkit-text-fill-color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Active word — glow + slight stretch to the right */
+/* Active word — subtle glow */
 .text-lyrics > span > span.word-active,
 .text-lyrics .bg-block > span.word-active {
   background-image: linear-gradient(
@@ -200,12 +200,11 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-repeat: no-repeat;
-  
+
   transform-origin: left center !important;
   text-shadow:
-    0 0 calc(3px + var(--word-glow, 0) * 16px) rgba(255, 255, 255, calc(0.35 + var(--word-glow, 0) * 0.4)),
-    0 0 calc(8px + var(--word-glow, 0) * 24px) rgba(255, 255, 255, calc(0.12 + var(--word-glow, 0) * 0.15));
-  transform: scaleX(calc(1 + var(--word-glow, 0) * 0.02)) scaleY(calc(1 + var(--word-glow, 0) * 0.035));
+    0 0 calc(2px + var(--word-glow, 0) * 8px) rgba(255, 255, 255, calc(0.15 + var(--word-glow, 0) * 0.2));
+  transform: scaleX(calc(1 + var(--word-glow, 0) * 0.01)) scaleY(calc(1 + var(--word-glow, 0) * 0.015));
   transition:
     transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
     text-shadow 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -290,6 +289,8 @@
   filter: blur(0px);
   -webkit-text-fill-color: var(--lyrics-word-active-color, #fff) !important;
   color: var(--lyrics-word-active-color, #fff) !important;
+  /* Prevent scale overflow from affecting layout */
+  contain: layout style;
 }
 
 /* When current line has word-by-word, the parent keeps the active color */
