@@ -44,15 +44,18 @@ export class BetterLyricsUnison implements LyricProvider {
           result = {
             title: info.title,
             artists: [info.artist],
-            lines: parsed.lines.map((line) => ({
-              time: line.time,
-              timeInMs: line.timeInMs,
-              duration: line.duration,
-              text: line.text,
-              status: 'upcoming' as const,
-              words: this.resolution === 'line' ? undefined : line.words,
-              voice: line.voice,
-            })),
+            lines: parsed.lines.map((line) => {
+              if (this.resolution === 'line') {
+                return { ...line, status: 'upcoming' as const, words: undefined };
+              }
+              if (line.words && line.words.length > 0) {
+                const allSameTiming = line.words.every(
+                  (w) => w.timeInMs === line.timeInMs && (w.duration ?? 0) >= line.duration,
+                );
+                if (allSameTiming) return { ...line, status: 'upcoming' as const, words: undefined };
+              }
+              return { ...line, status: 'upcoming' as const };
+            }),
           };
         } else if (data.format === 'lrc') {
           const parsed = LRC.parse(data.lyrics);
@@ -63,11 +66,18 @@ export class BetterLyricsUnison implements LyricProvider {
           result = {
             title: info.title,
             artists: [info.artist],
-            lines: parsed.lines.map((line) => ({
-              ...line,
-              status: 'upcoming' as const,
-              words: this.resolution === 'line' ? undefined : line.words,
-            })),
+            lines: parsed.lines.map((line) => {
+              if (this.resolution === 'line') {
+                return { ...line, status: 'upcoming' as const, words: undefined };
+              }
+              if (line.words && line.words.length > 0) {
+                const allSameTiming = line.words.every(
+                  (w) => w.timeInMs === line.timeInMs && (w.duration ?? 0) >= line.duration,
+                );
+                if (allSameTiming) return { ...line, status: 'upcoming' as const, words: undefined };
+              }
+              return { ...line, status: 'upcoming' as const };
+            }),
           };
         } else {
           // Plain text — only use if line-level or fallback

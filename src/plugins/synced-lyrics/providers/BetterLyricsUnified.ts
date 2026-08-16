@@ -371,10 +371,19 @@ export class BetterLyrics implements LyricProvider {
 
     return {
       ...res,
-      lines: res.lines?.map((l) => ({
-        ...l,
-        words: this.resolution === 'line' ? undefined : l.words,
-      })),
+      lines: res.lines?.map((l) => {
+        // If line resolution, always strip words
+        if (this.resolution === 'line') return { ...l, words: undefined };
+        // If words exist but all share the line's start time and full duration,
+        // they have no real word-level timing — strip to avoid forced word sync
+        if (l.words && l.words.length > 0) {
+          const allSameTiming = l.words.every(
+            (w) => w.timeInMs === l.timeInMs && (w.duration ?? 0) >= l.duration,
+          );
+          if (allSameTiming) return { ...l, words: undefined };
+        }
+        return { ...l, words: l.words };
+      }),
     };
   }
 }
@@ -401,10 +410,16 @@ export class BiniLyrics implements LyricProvider {
 
     return {
       ...res,
-      lines: res.lines?.map((l) => ({
-        ...l,
-        words: this.resolution === 'line' ? undefined : l.words,
-      })),
+      lines: res.lines?.map((l) => {
+        if (this.resolution === 'line') return { ...l, words: undefined };
+        if (l.words && l.words.length > 0) {
+          const allSameTiming = l.words.every(
+            (w) => w.timeInMs === l.timeInMs && (w.duration ?? 0) >= l.duration,
+          );
+          if (allSameTiming) return { ...l, words: undefined };
+        }
+        return { ...l, words: l.words };
+      }),
     };
   }
 }
