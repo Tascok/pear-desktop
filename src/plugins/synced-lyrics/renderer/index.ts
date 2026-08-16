@@ -8,15 +8,44 @@ import { fetchLyrics } from './store';
 import { selectors, tabStates } from './utils';
 import { fetchAnimatedArtwork } from './animated-artwork';
 
-// hls.js is loaded at runtime via the injected CDN URL — the library is too
-// large to bundle and Chromium on Linux needs it to play HLS .m3u8 streams.
+// hls.js is loaded at runtime via CDN injection — the renderer is a single IIFE
+// that cannot dynamically import npm packages at runtime.
+// Global reference set by loadHlsScript().
+declare global {
+  interface Window {
+    Hls?: {
+      default: typeof import('hls.js').default;
+      isSupported: () => boolean;
+    };
+  }
+}
+
 let Hls: typeof import('hls.js').default | null = null;
+
+async function loadHlsScript(): Promise<void> {
+  if (window.Hls) return;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.0/dist/hls.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load hls.js from CDN'));
+    document.head.appendChild(s);
+  });
+}
+
 async function ensureHls() {
   if (Hls) return Hls;
   try {
-    Hls = (await import('hls.js')).default;
+    await loadHlsScript();
+    if (!window.Hls) {
+      console.warn('[pear-animated-artwork] hls.js script loaded but window.Hls undefined');
+      return null;
+    }
+    Hls = window.Hls.default;
+    console.log('[pear-animated-artwork] hls.js loaded from CDN, isSupported:', Hls.isSupported());
     return Hls;
-  } catch {
+  } catch (e) {
+    console.warn('[pear-animated-artwork] hls.js CDN failed — cannot play .m3u8', e);
     return null;
   }
 }
