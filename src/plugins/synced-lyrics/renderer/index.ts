@@ -96,7 +96,14 @@ export const renderer = createRenderer<
   onConfigChange(newConfig) {
     setConfig(newConfig);
     // Toggle focus mode: only album art + lyrics visible
-    document.body.classList.toggle('pear-focus-mode', newConfig.focusMode === true);
+    const isFocusMode = newConfig.focusMode === true;
+    document.body.classList.toggle('pear-focus-mode', isFocusMode);
+    // Open player page so album art shows alongside lyrics
+    const layout = document.querySelector('#layout') as HTMLElement | null;
+    if (layout) {
+      if (isFocusMode) layout.setAttribute('player-page-open', '');
+      else layout.removeAttribute('player-page-open');
+    }
   },
 
   /**

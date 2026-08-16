@@ -890,11 +890,6 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
 }
 
 /* ─── Focus Mode ─── */
-body.pear-focus-mode #tab-renderer[page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS"]
-  > *:not(#synced-lyrics-container) {
-  display: none !important;
-}
-
 body.pear-focus-mode ytmusic-nav-bar,
 body.pear-focus-mode ytmusic-mini-player,
 body.pear-focus-mode ytmusic-player-bar,
@@ -904,15 +899,26 @@ body.pear-focus-mode ytmusic-search-box,
 body.pear-focus-mode [id^="search"],
 body.pear-focus-mode ytmusic-header-renderer,
 body.pear-focus-mode #header,
+body.pear-focus-mode #header-background,
 body.pear-focus-mode ytmusic-two-column-innertube-container ytmusic-guide-renderer,
 body.pear-focus-mode ytmusic-single-column-live-layout,
 body.pear-focus-mode .player-page-background,
-body.pear-focus-mode ytmusic-app-layout:not(.player-page-open) {
+body.pear-focus-mode #nav-bar-background,
+body.pear-focus-mode #player-bar-background,
+body.pear-focus-mode tp-yt-app-drawer,
+body.pear-focus-mode #guide-content,
+body.pear-focus-mode ytmusic-app-layout[player-page-open] ytmusic-nav-bar,
+body.pear-focus-mode ytmusic-app-layout[player-page-open] ytmusic-mini-player,
+body.pear-focus-mode ytmusic-app-layout[player-page-open] ytmusic-player-bar {
   display: none !important;
 }
 
 body.pear-focus-mode ytmusic-app-layout {
   background: transparent !important;
+}
+
+body.pear-focus-mode #layout {
+  --ytmusic-player-page-background-opacity: 0 !important;
 }
 
 /* ─── Enhanced Lyrics Animations ─── */
