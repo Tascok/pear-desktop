@@ -87,17 +87,13 @@ export const forceLoadRendererPlugin = async (id: string) => {
     loadedPluginMap[id] = plugin;
 
     if (plugin?.stylesheets) {
-      const styleSheetList = plugin.stylesheets.map((style) => {
-        const styleSheet = new CSSStyleSheet();
-        styleSheet.replaceSync(style);
-
-        return styleSheet;
+      unregisterStyleMap[id] = plugin.stylesheets.map((style) => {
+        const tag = document.createElement('style');
+        tag.id = `plugin-${id}`;
+        tag.textContent = style;
+        document.head.appendChild(tag);
+        return () => tag.remove();
       });
-
-      document.adoptedStyleSheets = [
-        ...document.adoptedStyleSheets,
-        ...styleSheetList,
-      ];
     }
 
     console.log(
