@@ -400,9 +400,10 @@ export const LyricsRenderer = () => {
         // Pre-calculate target position without triggering scroll,
         // then let CSS scroll-behavior:'smooth' animate natively
         // on the compositor thread (no main-thread RAF jank).
+        const startScrollTop = container.scrollTop;
         scroller()!.scrollToIndex(vlistIndex, { align: 'center' });
         const targetScrollTop = container.scrollTop;
-        container.scrollTop = 0; // reset to avoid jump
+        container.scrollTop = startScrollTop; // preserve position, then animate
         requestAnimationFrame(() => {
           container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
         });
