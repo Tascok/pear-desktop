@@ -142,11 +142,11 @@
   scale: var(--lyrics-inactive-scale);
   translate: var(--lyrics-inactive-offset);
   transition:
-    scale var(--lyrics-scale-duration) cubic-bezier(0.34, 1.2, 0.64, 1),
-    translate var(--lyrics-scale-duration) cubic-bezier(0.34, 1.2, 0.64, 1),
-    opacity var(--lyrics-opacity-transition) cubic-bezier(0.4, 0, 0.2, 1),
-    filter var(--lyrics-opacity-transition) cubic-bezier(0.4, 0, 0.2, 1),
-    letter-spacing 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    scale var(--lyrics-scale-duration) cubic-bezier(0.25, 0.1, 0.25, 1),
+    translate var(--lyrics-scale-duration) cubic-bezier(0.25, 0.1, 0.25, 1),
+    opacity var(--lyrics-opacity-transition) cubic-bezier(0.25, 0.1, 0.25, 1),
+    filter var(--lyrics-opacity-transition) cubic-bezier(0.25, 0.1, 0.25, 1),
+    letter-spacing 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -932,51 +932,32 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
   color: var(--lyrics-word-active-color, #fff) !important;
   letter-spacing: -0.01em;
   transition:
-    scale 0.6s cubic-bezier(0.34, 1.2, 0.64, 1),
-    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    filter 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    letter-spacing 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-    font-weight 0.4s ease;
+    scale 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
+    opacity 0.6s cubic-bezier(0.25, 0.1, 0.25, 1),
+    filter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1),
+    letter-spacing 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
+    font-weight 0.5s ease;
 }
 
 /* Previous line — smoother fade out */
 .synced-line.previous .text-lyrics {
   opacity: var(--lyrics-inactive-opacity);
-  filter: blur(1.5px);
+  filter: blur(1px);
   scale: var(--lyrics-inactive-scale);
   transform-origin: left center;
   transition:
-    opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
-    filter 0.7s cubic-bezier(0.4, 0, 0.2, 1),
-    scale 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 0.9s cubic-bezier(0.25, 0.1, 0.25, 1),
+    filter 0.9s cubic-bezier(0.25, 0.1, 0.25, 1),
+    scale 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Upcoming line — softer entry */
 .synced-line.upcoming .text-lyrics {
-  opacity: calc(var(--lyrics-inactive-opacity) * 1.8);
-  filter: blur(1px);
+  opacity: calc(var(--lyrics-inactive-opacity) * 2);
+  filter: blur(0.5px);
   scale: var(--lyrics-inactive-scale);
   transition:
-    opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-    filter 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-    scale 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Word progress bar effect — smooth fill line under words */
-.text-lyrics > span > span::after {
-  content: '';
-  position: absolute;
-  bottom: 2px;
-  left: 0;
-  width: calc(var(--word-progress, 0) * 100%);
-  height: 1.5px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0));
-  border-radius: 1px;
-  opacity: calc(var(--word-glow, 0) * 0.6);
-  transition: width 0.1s linear, opacity 0.2s ease;
-  pointer-events: none;
-}
-
-.text-lyrics > span > span {
-  position: relative;
+    opacity 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+    filter 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+    scale 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
 }

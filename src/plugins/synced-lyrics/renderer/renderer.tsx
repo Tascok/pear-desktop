@@ -168,12 +168,12 @@ export const [currentIndex, setCurrentIndex] = createSignal<number>(0);
 
 let activeScrollAnimationId: number | null = null;
 
-// Smooth scrolling with Apple-style cubic-bezier easing
-function easeOutExpo(t: number): number {
-  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+// Smooth, organic easing — Apple Music style (no bounce)
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-function animateScroll(element: HTMLElement, target: number, duration = 650) {
+function animateScroll(element: HTMLElement, target: number, duration = 500) {
   if (activeScrollAnimationId !== null) {
     cancelAnimationFrame(activeScrollAnimationId);
   }
@@ -197,7 +197,7 @@ function animateScroll(element: HTMLElement, target: number, duration = 650) {
   const animate = (time: number) => {
     const elapsed = time - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    const eased = easeOutExpo(progress);
+    const eased = easeInOutCubic(progress);
 
     element.scrollTop = start + (change * eased);
 
