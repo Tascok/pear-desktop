@@ -283,11 +283,29 @@ export const renderer = createRenderer<
         }
 
         destroyHls();
-        const hls = new hlsLib();
+        const hls = new hlsLib({
+          // Never cap quality to player pixel size — keeps highest available level
+          capLevelToPlayerSize: false,
+          // Never downgrade on FPS drops — quality should only follow real bandwidth
+          fpsController: undefined as unknown as typeof import('hls.js').FPSController | undefined,
+          // Aggressive initial bandwidth estimate (5 Mbps) — starts at high quality
+          abrEwmaDefaultEstimate: 5_000_000,
+          abrEwmaDefaultEstimateMax: 20_000_000,
+          abrBandWidthFactor: 0.9,    // slightly aggressive when estimating
+          abrBandWidthUpFactor: 1.1,  // recover faster when bandwidth improves
+          abrMaxWithRealBitrate: true,
+          // Generous buffer — prevents rebuffer-triggered quality drops
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          highBufferWatchdogPeriod: 2,
+          // Disable FPS-based level capping entirely
+          ignoreDevicePixelRatio: true,
+          maxDevicePixelRatio: 4,
+        });
         currentHls = hls;
         hls.loadSource(src);
         hls.attachMedia(pearVideo);
-        console.log('[pear-animated-artwork] loading HLS stream:', src);
+        console.log('[pear-animated-artwork] loading HLS stream:', src, 'with quality config');
         await new Promise<void>((resolve) => {
           hls.on(hlsLib.Events.MANIFEST_PARSED, () => {
             console.log('[pear-animated-artwork] HLS manifest parsed — stream ready');
