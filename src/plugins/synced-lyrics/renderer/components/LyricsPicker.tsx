@@ -33,7 +33,6 @@ import {
 } from '../../providers';
 import { _ytAPI } from '../index';
 import { reactiveOwner } from '../reactive-root';
-import { setIsSettingsOpen } from '../renderer';
 import { config, currentLyrics, lyricsStore, setLyricsStore } from '../store';
 
 import type { PlayerAPIEvents } from '@/types/player-api-events';
@@ -307,16 +306,6 @@ export const LyricsPicker = (props: {
             }}
           />
         </mdui-button-icon>
-        <button
-          class="lyrics-settings-btn"
-          onClick={() => setIsSettingsOpen(true)}
-          title="Configuração de Provedores"
-          type="button"
-        >
-          <svg fill="currentColor" height="20" viewBox="0 -960 960 960" width="20" xmlns="http://www.w3.org/2000/svg">
-            <path d="m370-80-16-128q-19-5-38.5-15.5T279-247l-120 50-100-173 102-76q-2-10-2-20t2-20l-102-76 100-173 120 50q17-14 36.5-24.5T354-800l16-128h200l16 128q19 5 38.5 15.5T681-713l120-50 100 173-102 76q2 10 2 20t-2 20l102 76-100 173-120-50q-17 14-36.5 24.5T606-160l-16 128H370Zm110-280q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/>
-          </svg>
-        </button>
       </div>
     </div>
   );

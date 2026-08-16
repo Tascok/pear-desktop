@@ -2,7 +2,6 @@ import {
   createEffect,
   createMemo,
   createSignal,
-  For,
   onCleanup,
   onMount,
   runWithOwner,
@@ -20,7 +19,6 @@ import {
   PauseIndicator,
 } from './components';
 import { LyricsPicker } from './components/LyricsPicker';
-import { saveConfig } from './index';
 import { reactiveOwner } from './reactive-root';
 import { config, currentLyrics, setConfig } from './store';
 import { selectors } from './utils';
@@ -30,7 +28,6 @@ import type { LineLyrics } from '../types';
 export { config, setConfig };
 
 export const [isVisible, setIsVisible] = createSignal<boolean>(false);
-export const [isSettingsOpen, setIsSettingsOpen] = createSignal<boolean>(false);
 
 runWithOwner(reactiveOwner, () => {
   createEffect(() => {
@@ -499,100 +496,6 @@ export const LyricsRenderer = () => {
             }
           }}
         </VList>
-
-        <Show when={isSettingsOpen()}>
-          <div class="lyrics-settings-backdrop" onClick={() => setIsSettingsOpen(false)}>
-            <div class="lyrics-settings-modal" onClick={(e) => e.stopPropagation()}>
-              <div class="lyrics-settings-header">
-                <h3>Provedores de Letras</h3>
-                <button class="lyrics-settings-close-btn" onClick={() => setIsSettingsOpen(false)}>
-                  &times;
-                </button>
-              </div>
-              
-              <p class="lyrics-settings-help">
-                Arraste para reordenar a prioridade. Ative ou desative cada provedor nos seletores.
-              </p>
-
-              <div class="lyrics-providers-list">
-                <For each={config()?.providersOrder || []}>
-                  {(entry, index) => {
-                    const [isDragging, setIsDragging] = createSignal(false);
-                    
-                    const handleDragStart = (e: DragEvent) => {
-                      e.dataTransfer?.setData('text/plain', String(index()));
-                      setIsDragging(true);
-                    };
-
-                    const handleDragOver = (e: DragEvent) => {
-                      e.preventDefault();
-                    };
-
-                    const handleDrop = (e: DragEvent) => {
-                      e.preventDefault();
-                      const fromIndexStr = e.dataTransfer?.getData('text/plain');
-                      if (fromIndexStr === undefined || fromIndexStr === '') return;
-                      const fromIndex = parseInt(fromIndexStr, 10);
-                      const toIndex = index();
-                      if (fromIndex === toIndex) return;
-
-                      const list = [...(config()?.providersOrder || [])];
-                      const [draggedItem] = list.splice(fromIndex, 1);
-                      list.splice(toIndex, 0, draggedItem);
-                      saveConfig({ providersOrder: list });
-                    };
-
-                    const handleDragEnd = () => {
-                      setIsDragging(false);
-                    };
-
-                    const toggleProvider = () => {
-                      const list = (config()?.providersOrder || []).map((p, idx) => {
-                        if (idx === index()) {
-                          return { ...p, enabled: !p.enabled };
-                        }
-                        return p;
-                      });
-                      saveConfig({ providersOrder: list });
-                    };
-
-                    return (
-                      <div
-                        class={`lyrics-provider-card ${isDragging() ? 'dragging' : ''}`}
-                        data-enabled={entry.enabled ? 'true' : 'false'}
-                        draggable={true}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={handleDragOver}
-                        onDragStart={handleDragStart}
-                        onDrop={handleDrop}
-                      >
-                        <div class="lyrics-card-drag-handle">
-                          ⠿
-                        </div>
-                        
-                        <div class="lyrics-card-info">
-                          <span class="lyrics-card-name">{entry.name}</span>
-                          <span class={`lyrics-card-badge res-${entry.resolution.toLowerCase()}`}>
-                            {entry.resolution}
-                          </span>
-                        </div>
-
-                        <label class="lyrics-card-switch">
-                          <input
-                            checked={entry.enabled}
-                            onChange={toggleProvider}
-                            type="checkbox"
-                          />
-                          <span class="lyrics-card-slider" />
-                        </label>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
-            </div>
-          </div>
-        </Show>
       </div>
     </Show>
   );

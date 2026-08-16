@@ -149,11 +149,48 @@ export const renderer = createRenderer<
     // only applies on the lyrics tab page, not on other screens.
     document.body.classList.add('has-synced-lyrics-bg');
 
+    // Detect and play bls-video (animated artwork from YouTube Music)
+    const initBlsVideo = () => {
+      const blsVideo = document.querySelector<HTMLMediaElement>('video#bls-video');
+      if (!blsVideo || blsVideo.dataset.pearHandled === '1') return;
+      blsVideo.dataset.pearHandled = '1';
+      (blsVideo as HTMLVideoElement).muted = true;
+      (blsVideo as HTMLVideoElement).playsInline = true;
+      blsVideo.loop = true;
+      blsVideo.pause();
+    };
+
+    let blsObserver: MutationObserver | null = null;
+    const setupBlsObserver = () => {
+      if (blsObserver) return;
+      blsObserver = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.addedNodes.length) {
+            for (const node of m.addedNodes) {
+              if (node instanceof Element && node.matches('video#bls-video')) {
+                initBlsVideo();
+                return;
+              }
+              if (node instanceof HTMLElement) {
+                const v = node.querySelector('video#bls-video');
+                if (v) { initBlsVideo(); return; }
+              }
+            }
+          }
+        }
+      });
+      blsObserver.observe(document.body, { childList: true, subtree: true });
+    };
+
     ctx.ipc.on('peard:update-song-info', (info: SongInfo) => {
       fetchLyrics(info);
       if (info && info.imageSrc) {
         updateBackdropColors(info.imageSrc);
         triggerBackdropBeat();
+      }
+      setupBlsObserver();
+      if (document.querySelector('video#bls-video')) {
+        initBlsVideo();
       }
     });
   },
