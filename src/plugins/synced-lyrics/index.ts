@@ -27,6 +27,7 @@ export default createPlugin<
     defaultTextString: '♪',
     lineEffect: 'fancy',
     romanization: true,
+    focusMode: false,
     providersOrder: [
       { id: 'LyricsPlus', name: 'LyricsPlus (Sílaba/Palavra)', resolution: 'SÍLABA', enabled: true },
       { id: 'MusixMatchWord', name: 'MusixMatch Word-by-Word', resolution: 'SÍLABA', enabled: true },

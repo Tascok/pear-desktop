@@ -24,6 +24,7 @@ export type SyncedLyricsPluginConfig = {
     | 'simplifiedToTraditional'
     | 'traditionalToSimplified'
     | 'disabled';
+  focusMode: boolean;
 };
 
 export type LineLyricsStatus = 'previous' | 'current' | 'upcoming';

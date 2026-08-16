@@ -902,6 +902,10 @@
         "show-time-codes": {
           "label": "Mostrar códigos de tempo",
           "tooltip": "Mostrar os códigos de tempo ao lado das letras"
+        },
+        "focus-mode": {
+          "label": "Modo foco",
+          "tooltip": "Mostrar apenas a capa do álbum e a letra sincronizada, ocultando tudo o mais"
         }
       },
       "name": "Letras sincronizadas",

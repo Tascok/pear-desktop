@@ -909,6 +909,10 @@
             }
           },
           "tooltip": "Convert Chinese character to Traditional or Simplified"
+        },
+        "focus-mode": {
+          "label": "Focus mode",
+          "tooltip": "Show only the album art and synced lyrics, hiding everything else"
         }
       },
       "name": "Synced Lyrics",

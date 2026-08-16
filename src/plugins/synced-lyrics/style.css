@@ -889,6 +889,32 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
   opacity: 1;
 }
 
+/* ─── Focus Mode ─── */
+body.pear-focus-mode #tab-renderer[page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS"]
+  > *:not(#synced-lyrics-container) {
+  display: none !important;
+}
+
+body.pear-focus-mode ytmusic-nav-bar,
+body.pear-focus-mode ytmusic-mini-player,
+body.pear-focus-mode ytmusic-player-bar,
+body.pear-focus-mode ytmusic-pivot-bar-renderer,
+body.pear-focus-mode ytmusic-guide-entry-renderer,
+body.pear-focus-mode ytmusic-search-box,
+body.pear-focus-mode [id^="search"],
+body.pear-focus-mode ytmusic-header-renderer,
+body.pear-focus-mode #header,
+body.pear-focus-mode ytmusic-two-column-innertube-container ytmusic-guide-renderer,
+body.pear-focus-mode ytmusic-single-column-live-layout,
+body.pear-focus-mode .player-page-background,
+body.pear-focus-mode ytmusic-app-layout:not(.player-page-open) {
+  display: none !important;
+}
+
+body.pear-focus-mode ytmusic-app-layout {
+  background: transparent !important;
+}
+
 /* ─── Enhanced Lyrics Animations ─── */
 
 /* Smooth scroll — GPU-accelerated, compositor-thread animation */

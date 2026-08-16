@@ -233,5 +233,14 @@ export const menu = async (
         });
       },
     },
+    {
+      label: t('plugins.synced-lyrics.menu.focus-mode.label'),
+      toolTip: t('plugins.synced-lyrics.menu.focus-mode.tooltip'),
+      type: 'checkbox',
+      checked: config.focusMode,
+      click(item) {
+        ctx.setConfig({ focusMode: item.checked });
+      },
+    },
   ];
 };

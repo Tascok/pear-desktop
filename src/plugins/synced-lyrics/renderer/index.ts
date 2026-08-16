@@ -95,6 +95,8 @@ export const renderer = createRenderer<
 
   onConfigChange(newConfig) {
     setConfig(newConfig);
+    // Toggle focus mode: only album art + lyrics visible
+    document.body.classList.toggle('pear-focus-mode', newConfig.focusMode === true);
   },
 
   /**
