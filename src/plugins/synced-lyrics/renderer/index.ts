@@ -92,14 +92,18 @@ export const renderer = createRenderer<
       this.updateTimestampInterval = undefined;
     }
 
+    let lastLoggedTime = -1;
     const tick = () => {
       const video = document.querySelector('video');
       if (video) {
-        const timeMs = video.currentTime * 1000;
-        console.log('[Lyrics] RAF tick →', Math.round(timeMs), 'ms');
+        const timeMs = Math.round(video.currentTime * 1000);
+        if (timeMs !== lastLoggedTime) {
+          console.log('[Lyrics] RAF tick →', timeMs, 'ms');
+          lastLoggedTime = timeMs;
+        }
         setCurrentTime(timeMs);
       } else {
-        console.warn('[Lyrics] RAF tick: no <video> element found');
+        console.warn('[Lyrics] RAF tick: no <video> element found (skipping tick)');
       }
       this.updateTimestampInterval = requestAnimationFrame(tick);
     };
@@ -162,6 +166,10 @@ export const renderer = createRenderer<
   },
 
   stop() {
+    if (this.updateTimestampInterval) {
+      cancelAnimationFrame(this.updateTimestampInterval as number);
+      this.updateTimestampInterval = undefined;
+    }
     this.observer?.disconnect();
     this.layoutObserver?.disconnect();
     destroyBackdrop();
