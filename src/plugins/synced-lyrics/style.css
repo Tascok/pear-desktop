@@ -890,11 +890,6 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
 }
 
 /* ─── Focus Mode ─── */
-body.pear-focus-mode #tab-renderer[page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS"]
-  > *:not(#synced-lyrics-container) {
-  display: none !important;
-}
-
 body.pear-focus-mode ytmusic-nav-bar,
 body.pear-focus-mode ytmusic-mini-player,
 body.pear-focus-mode ytmusic-player-bar,
@@ -907,12 +902,27 @@ body.pear-focus-mode #header,
 body.pear-focus-mode ytmusic-two-column-innertube-container ytmusic-guide-renderer,
 body.pear-focus-mode ytmusic-single-column-live-layout,
 body.pear-focus-mode .player-page-background,
-body.pear-focus-mode ytmusic-app-layout:not(.player-page-open) {
+body.pear-focus-mode ytmusic-app-layout {
+  background: transparent !important;
+}
+
+body.pear-focus-mode #tab-renderer[page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS"]
+  > *:not(#synced-lyrics-container) {
   display: none !important;
 }
 
-body.pear-focus-mode ytmusic-app-layout {
+body.pear-focus-mode #synced-lyrics-container {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  width: 100vw !important;
+  height: 100vh !important;
   background: transparent !important;
+}
+
+body.pear-focus-mode #song-image,
+body.pear-focus-mode #pear-animated-artwork {
+  z-index: 1 !important;
 }
 
 /* ─── Enhanced Lyrics Animations ─── */
