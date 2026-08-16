@@ -381,6 +381,8 @@ export const LyricsRenderer = () => {
     return nextLineIdx - 1;
   });
 
+  console.log('[Lyrics] scrollIndex changed:', scrollIndex(), 'currentTime:', currentTime());
+
   const [statuses, setStatuses] = createSignal<
     ('previous' | 'current' | 'upcoming')[]
   >([]);
@@ -406,6 +408,8 @@ export const LyricsRenderer = () => {
 
   createEffect(() => {
     const activeIdx = scrollIndex();
+    const data = currentLyrics()?.data;
+    console.log('[Lyrics] scroll effect activeIdx=', activeIdx, 'lines=', data?.lines?.length, 'currentTime=', currentTime());
     if (activeIdx === -1) return;
     setCurrentIndex(activeIdx);
   });
@@ -440,6 +444,7 @@ export const LyricsRenderer = () => {
         const targetScrollTop = container.scrollTop;
         container.scrollTop = startScrollTop;
 
+        console.log('[Lyrics] animateScroll', { vlistIndex, startScrollTop, targetScrollTop });
         animateScroll(container, targetScrollTop);
       } else {
         console.warn('[Lyrics] .synced-lyrics-vlist not in DOM, using smooth scroll');

@@ -84,6 +84,8 @@ export const renderer = createRenderer<
     playerPageOpen: boolean;
     _mainVideo?: HTMLVideoElement;
     _mainVideoListenersAdded: boolean;
+    _videoTimeUpdateHandler?: () => void;
+    _ytVideoTimeFallback?: () => void;
   },
   SyncedLyricsPluginConfig
 >({
@@ -141,22 +143,74 @@ export const renderer = createRenderer<
     await this.videoDataChange();
   },
   async videoDataChange() {
+    console.log('[Lyrics] videoDataChange called');
     // Cancel any previous RAF tick to prevent multiple loops running
     if (this.updateTimestampInterval) {
       cancelAnimationFrame(this.updateTimestampInterval as number);
       this.updateTimestampInterval = undefined;
     }
+    // Detach any previous video listener
+    if (this._mainVideo && this._videoTimeUpdateHandler) {
+      this._mainVideo.removeEventListener('timeupdate', this._videoTimeUpdateHandler);
+      this._mainVideo.removeEventListener('seeked', this._videoTimeUpdateHandler);
+      this._videoTimeUpdateHandler = undefined;
+    }
+    if (this._ytVideoTimeFallback && typeof window !== 'undefined') {
+      window.removeEventListener('yt-video-data-change', this._ytVideoTimeFallback);
+      this._ytVideoTimeFallback = undefined;
+    }
+
+    const updateTime = () => {
+      // Exclude #pear-animated-artwork to get the main YouTube player video
+      const video = document.querySelector('video:not(#pear-animated-artwork)') as HTMLVideoElement | null;
+      const videoTime = video?.currentTime ?? NaN;
+      const ytTime = typeof _ytAPI?.getCurrentTime === 'function' ? _ytAPI.getCurrentTime() : undefined;
+      if (video && Number.isFinite(videoTime)) {
+        setCurrentTime(videoTime * 1000);
+      } else {
+        // Fallback to ytAPI if available
+        try {
+          const t = ytTime;
+          if (typeof t === 'number' && Number.isFinite(t)) {
+            setCurrentTime(t * 1000);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      console.log('[Lyrics] updateTime probe', { hasVideo: !!video, videoTime, ytTime });
+    };
 
     const tick = () => {
-      const video = document.querySelector('video');
-      if (video) {
-        setCurrentTime(video.currentTime * 1000);
-      } else {
-        console.warn('[Lyrics] RAF tick: no <video> element found (skipping tick)');
-      }
+      updateTime();
       this.updateTimestampInterval = requestAnimationFrame(tick);
     };
     this.updateTimestampInterval = requestAnimationFrame(tick);
+    console.log('[Lyrics] RAF tick started');
+
+    // Listen for HTML5 timeupdate events on the <video> element as a
+    // fallback/second source — covers seek and frame-level changes even
+    // when RAF is throttled (background tabs, low-power mode, etc.).
+    const tryAttachVideoListeners = () => {
+      // Exclude #pear-animated-artwork to get the main YouTube player video
+      const video = document.querySelector('video:not(#pear-animated-artwork)') as HTMLVideoElement | null;
+      if (!video) return false;
+      this._mainVideo = video;
+      this._videoTimeUpdateHandler = updateTime;
+      video.addEventListener('timeupdate', updateTime);
+      video.addEventListener('seeked', updateTime);
+      console.log('[Lyrics] Attached HTML5 video time listeners');
+      return true;
+    };
+    if (!tryAttachVideoListeners()) {
+      // Retry every 500ms for up to ~10s, then give up gracefully
+      let attempts = 0;
+      const tryLater = () => {
+        if (tryAttachVideoListeners() || ++attempts > 20) return;
+        setTimeout(tryLater, 500);
+      };
+      setTimeout(tryLater, 500);
+    }
 
     // prettier-ignore
     this.observer ??= new MutationObserver(this.observerCallback);
@@ -266,7 +320,7 @@ export const renderer = createRenderer<
       const { signal } = artworkController;
 
       // Sync play/pause with main player
-      const mainVideo = document.querySelector<HTMLVideoElement>('video');
+      const mainVideo = document.querySelector<HTMLVideoElement>('video:not(#pear-animated-artwork)');
       const isPlaying = mainVideo ? !mainVideo.paused : false;
 
       try {
@@ -313,7 +367,7 @@ export const renderer = createRenderer<
 
     // Listen for play/pause on the main player video
     const syncMainPlayer = () => {
-      const mv = document.querySelector<HTMLVideoElement>('video');
+      const mv = document.querySelector<HTMLVideoElement>('video:not(#pear-animated-artwork)');
       if (!mv || this._mainVideoListenersAdded) return;
       mv.addEventListener('play', () => {
         if (pearVideo.src || currentHls) {
@@ -343,6 +397,15 @@ export const renderer = createRenderer<
     if (this.updateTimestampInterval) {
       cancelAnimationFrame(this.updateTimestampInterval as number);
       this.updateTimestampInterval = undefined;
+    }
+    if (this._mainVideo && this._videoTimeUpdateHandler) {
+      this._mainVideo.removeEventListener('timeupdate', this._videoTimeUpdateHandler);
+      this._mainVideo.removeEventListener('seeked', this._videoTimeUpdateHandler);
+      this._videoTimeUpdateHandler = undefined;
+    }
+    if (this._ytVideoTimeFallback && typeof window !== 'undefined') {
+      window.removeEventListener('yt-video-data-change', this._ytVideoTimeFallback);
+      this._ytVideoTimeFallback = undefined;
     }
     this.observer?.disconnect();
     this.layoutObserver?.disconnect();

@@ -14,6 +14,40 @@
   scrollbar-width: none;
 }
 
+/* ─── SF Pro Display font ─── */
+@font-face {
+  font-family: 'SF Pro Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/npm/sf-pro@1.0.3/font/woff2/sf-pro-display_regular.woff2')
+    format('woff2');
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/npm/sf-pro@1.0.3/font/woff2/sf-pro-display_medium.woff2')
+    format('woff2');
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/npm/sf-pro@1.0.3/font/woff2/sf-pro-display_semibold.woff2')
+    format('woff2');
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://cdn.jsdelivr.net/npm/sf-pro@1.0.3/font/woff2/sf-pro-display_bold.woff2')
+    format('woff2');
+}
+
 @property --lyrics-duration {
   syntax: '<time>';
   inherits: false;
@@ -28,7 +62,7 @@
 
   /* Typography */
   --lyrics-font-family:
-    Satoshi, var(--noto-sans-universal), Avenir, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    'SF Pro Display', var(--noto-sans-universal), Avenir, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
     Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif;
   --lyrics-font-size: clamp(1.8rem, 1.35vmax, 3.2rem);
   --lyrics-line-height: 1.3;
@@ -182,7 +216,7 @@
 }
 
 /* If no word timestamps, the current active line text should be solid white */
-.current .text-lyrics .no-word-timestamps {
+.synced-line.current .text-lyrics .no-word-timestamps {
   color: var(--lyrics-word-active-color, #fff) !important;
   -webkit-text-fill-color: var(--lyrics-word-active-color, #fff) !important;
 }
@@ -221,14 +255,14 @@
 }
 
 /* ─── Previous line — fully dimmed & blurred ─── */
-.previous .text-lyrics {
+.synced-line.previous .text-lyrics {
   opacity: var(--lyrics-inactive-opacity);
   filter: blur(2px);
   scale: var(--lyrics-inactive-scale);
 }
 
-.previous .text-lyrics > span > span,
-.previous .text-lyrics .bg-block > span {
+.synced-line.previous .text-lyrics > span > span,
+.synced-line.previous .text-lyrics .bg-block > span {
   background-image: none !important;
   -webkit-text-fill-color: var(--lyrics-inactive-text-color, rgba(255, 255, 255, 0.32)) !important;
   text-shadow: none !important;
@@ -236,18 +270,27 @@
 }
 
 /* ─── Upcoming line ─── */
-.upcoming .text-lyrics {
+.synced-line.upcoming .text-lyrics {
   opacity: calc(var(--lyrics-inactive-opacity) * 1.5);
   filter: blur(1.5px);
   scale: var(--lyrics-inactive-scale);
 }
 
 /* ─── Current line ─── */
-.current .text-lyrics {
-  opacity: var(--lyrics-active-opacity);
+.synced-line.current .text-lyrics {
+  opacity: var(--lyrics-active-opacity) !important;
   font-weight: var(--lyrics-active-font-weight) !important;
   scale: var(--lyrics-active-scale);
   filter: blur(0px);
+  -webkit-text-fill-color: var(--lyrics-word-active-color, #fff) !important;
+  color: var(--lyrics-word-active-color, #fff) !important;
+}
+
+/* When current line has word-by-word, the parent keeps the active color */
+.synced-line.current .text-lyrics > span > span:not(.word-active):not(.word-done),
+.synced-line.current .text-lyrics .bg-block > span:not(.word-active):not(.word-done) {
+  color: var(--lyrics-inactive-text-color, rgba(255, 255, 255, 0.32));
+  -webkit-text-fill-color: var(--lyrics-inactive-text-color, rgba(255, 255, 255, 0.32));
 }
 
 /* ─── Voice layout ─── */
