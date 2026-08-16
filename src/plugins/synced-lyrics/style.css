@@ -818,18 +818,22 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
   box-shadow: 0 1px 5px rgba(30, 144, 255, 0.4);
 }
 
-/* ─── Animated Artwork (bls-video mirror) ─── */
+/* ─── Animated Artwork (iTunes / Apple Music API) ─── */
+#song-image {
+  position: relative;
+  overflow: hidden;
+}
 #pear-animated-artwork {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  z-index: 0;
+  border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.5s ease;
+  z-index: 1;
 }
 #pear-animated-artwork[src]:not([src=""]) {
   opacity: 1;

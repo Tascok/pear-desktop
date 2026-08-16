@@ -6,6 +6,20 @@ import { disposeReactiveRoot } from './reactive-root';
 import { setConfig, setCurrentTime } from './renderer';
 import { fetchLyrics } from './store';
 import { selectors, tabStates } from './utils';
+import { fetchAnimatedArtwork } from './animated-artwork';
+
+// hls.js is loaded at runtime via the injected CDN URL — the library is too
+// large to bundle and Chromium on Linux needs it to play HLS .m3u8 streams.
+let Hls: typeof import('hls.js').default | null = null;
+async function ensureHls() {
+  if (Hls) return Hls;
+  try {
+    Hls = (await import('hls.js')).default;
+    return Hls;
+  } catch {
+    return null;
+  }
+}
 
 import type { SyncedLyricsPluginConfig } from '../types';
 import type { SongInfo } from '@/providers/song-info';
@@ -18,6 +32,15 @@ export let netFetch: (
   init?: RequestInit,
 ) => Promise<[number, string, Record<string, string>]>;
 export let saveConfig: (config: Partial<SyncedLyricsPluginConfig>) => void = () => {};
+let artworkController: AbortController | null = null;
+let currentHls: import('hls.js').default | null = null;
+
+function destroyHls() {
+  if (currentHls) {
+    currentHls.destroy();
+    currentHls = null;
+  }
+}
 
 export const renderer = createRenderer<
   {
@@ -152,62 +175,105 @@ export const renderer = createRenderer<
     // only applies on the lyrics tab page, not on other screens.
     document.body.classList.add('has-synced-lyrics-bg');
 
-    // ─── Animated Artwork (bls-video) ───
-    // Mirror YouTube Music's #bls-video into our own <video> overlay,
-    // synced to the main player's play/pause state (same approach as
-    // the Better Lyrics extension).
+    // ─── Animated Artwork (iTunes / Apple Music API) ───
     const pearVideo = document.createElement('video');
     pearVideo.id = 'pear-animated-artwork';
     pearVideo.muted = true;
     pearVideo.playsInline = true;
     pearVideo.loop = true;
-    // No display:none — must be visible to play animated artwork
-    document.body.appendChild(pearVideo);
+    pearVideo.style.display = 'none';
+    const songImage = document.querySelector<HTMLElement>('#song-image');
+    (songImage ?? document.body).appendChild(pearVideo);
 
-    const syncAnimatedArtwork = () => {
-      const blsVideo = document.querySelector<HTMLVideoElement>('video#bls-video');
-      if (!blsVideo) return;
-      const src = blsVideo.currentSrc || blsVideo.querySelector('source')?.src || '';
-      if (!src) return;
+    const loadVideoSource = async (src: string) => {
+      const isM3u8 = src.includes('.m3u8');
+
+      // .m3u8 (HLS) needs hls.js on Chromium; native HLS only works in Safari.
+      if (isM3u8) {
+        const hlsLib = await ensureHls();
+        if (!hlsLib) return false;
+
+        if (!hlsLib.isSupported()) return false;
+
+        destroyHls();
+        const hls = new hlsLib();
+        currentHls = hls;
+        hls.loadSource(src);
+        hls.attachMedia(pearVideo);
+        await new Promise<void>((resolve) => {
+          hls.on(hlsLib.Events.MANIFEST_PARSED, () => resolve());
+          hls.on(hlsLib.Events.ERROR, () => resolve());
+        });
+        return true;
+      }
+
+      // Direct video src (mp4/mov)
+      destroyHls();
       if (pearVideo.src !== src) {
         pearVideo.src = src;
         pearVideo.load();
       }
-      const mainVideo = document.querySelector<HTMLVideoElement>('video');
-      const isPlaying = mainVideo ? !mainVideo.paused : false;
-      if (isPlaying && pearVideo.paused) void pearVideo.play().catch(() => {});
-      else if (!isPlaying && !pearVideo.paused) pearVideo.pause();
+      return true;
     };
 
-    let blsObserver: MutationObserver | null = null;
-    const setupBlsObserver = () => {
-      if (blsObserver) return;
-      blsObserver = new MutationObserver((mutations) => {
-        for (const m of mutations) {
-          // Catch #bls-video appearing via DOM insertion
-          if (m.addedNodes.length) {
-            for (const node of m.addedNodes) {
-              if (node instanceof Element && node.matches('video#bls-video')) {
-                syncAnimatedArtwork();
-                return;
-              }
-              if (node instanceof HTMLElement) {
-                const v = node.querySelector('video#bls-video');
-                if (v) { syncAnimatedArtwork(); return; }
-              }
-            }
+    const applyAnimatedArtwork = async (info: SongInfo) => {
+      // Cancel any previous pending request
+      artworkController?.abort();
+      artworkController = new AbortController();
+      const { signal } = artworkController;
+
+      // Sync play/pause with main player
+      const mainVideo = document.querySelector<HTMLVideoElement>('video');
+      const isPlaying = mainVideo ? !mainVideo.paused : false;
+
+      try {
+        const result = await fetchAnimatedArtwork(info, netFetch);
+        if (signal.aborted) return;
+
+        if (result.videoSrc) {
+          // Animated artwork found — load via hls.js (m3u8) or direct src
+          const loaded = await loadVideoSource(result.videoSrc);
+          if (signal.aborted || !loaded) {
+            if (!loaded) destroyHls();
+            return;
           }
-          // Catch src/currentSrc changing on an existing #bls-video (new song)
-          if (
-            m.target instanceof HTMLVideoElement &&
-            m.target.id === 'bls-video' &&
-            (m.attributeName === 'src' || m.attributeName === 'currentSrc')
-          ) {
-            syncAnimatedArtwork();
+          pearVideo.style.display = '';
+          if (isPlaying && pearVideo.paused) void pearVideo.play().catch(() => {});
+          else if (!isPlaying && !pearVideo.paused) pearVideo.pause();
+
+          // Update static album art to high-res iTunes version as fallback
+          if (result.staticArtwork && info.imageSrc !== result.staticArtwork) {
+            const img = document.querySelector('#song-image yt-img-shadow > img') as HTMLImageElement | null;
+            if (img) img.src = result.staticArtwork;
           }
+        } else if (result.staticArtwork && info.imageSrc !== result.staticArtwork) {
+          // No animated artwork — upgrade to high-res static image
+          const img = document.querySelector('#song-image yt-img-shadow > img') as HTMLImageElement | null;
+          if (img) img.src = result.staticArtwork;
+          destroyHls();
+          pearVideo.style.display = 'none';
+          pearVideo.removeAttribute('src');
+        }
+      } catch {
+        // Fetch failed — keep current state
+      }
+    };
+
+    // Listen for play/pause on the main player video
+    const syncMainPlayer = () => {
+      const mv = document.querySelector<HTMLVideoElement>('video');
+      if (!mv || this._mainVideoListenersAdded) return;
+      mv.addEventListener('play', () => {
+        if (pearVideo.src || currentHls) {
+          pearVideo.style.display = '';
+          void pearVideo.play().catch(() => {});
         }
       });
-      blsObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'currentSrc'] });
+      mv.addEventListener('pause', () => {
+        if (pearVideo.src || currentHls) pearVideo.pause();
+      });
+      this._mainVideoListenersAdded = true;
+      this._mainVideo = mv;
     };
 
     ctx.ipc.on('peard:update-song-info', (info: SongInfo) => {
@@ -216,20 +282,9 @@ export const renderer = createRenderer<
         updateBackdropColors(info.imageSrc);
         triggerBackdropBeat();
       }
-      setupBlsObserver();
-      syncWithMainPlayer();
-      syncAnimatedArtwork();
+      syncMainPlayer();
+      applyAnimatedArtwork(info);
     });
-
-    // Sync animated artwork play/pause with the main player video
-    const syncWithMainPlayer = () => {
-      const mv = document.querySelector<HTMLVideoElement>('video');
-      if (!mv || this._mainVideoListenersAdded) return;
-      mv.addEventListener('play', syncAnimatedArtwork);
-      mv.addEventListener('pause', syncAnimatedArtwork);
-      this._mainVideoListenersAdded = true;
-      this._mainVideo = mv;
-    };
   },
 
   stop() {
@@ -246,6 +301,9 @@ export const renderer = createRenderer<
     }
     const pearVideo = document.getElementById('pear-animated-artwork');
     if (pearVideo) pearVideo.remove();
+    destroyHls();
+    artworkController?.abort();
+    artworkController = null;
     document.body.classList.remove('has-synced-lyrics-bg', 'webgl-active');
     disposeReactiveRoot();
   },
