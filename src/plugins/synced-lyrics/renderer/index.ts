@@ -95,10 +95,15 @@ export const renderer = createRenderer<
     const tick = () => {
       const video = document.querySelector('video');
       if (video) {
-        setCurrentTime(video.currentTime * 1000);
+        const timeMs = video.currentTime * 1000;
+        console.log('[Lyrics] RAF tick →', Math.round(timeMs), 'ms');
+        setCurrentTime(timeMs);
+      } else {
+        console.warn('[Lyrics] RAF tick: no <video> element found');
       }
       this.updateTimestampInterval = requestAnimationFrame(tick);
     };
+    console.log('[Lyrics] RAF loop started');
     this.updateTimestampInterval = requestAnimationFrame(tick);
 
     // prettier-ignore
