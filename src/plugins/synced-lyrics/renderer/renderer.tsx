@@ -168,7 +168,12 @@ export const [currentIndex, setCurrentIndex] = createSignal<number>(0);
 
 let activeScrollAnimationId: number | null = null;
 
-function animateScroll(element: HTMLElement, target: number, duration = 900) {
+// Smooth scrolling with Apple-style cubic-bezier easing
+function easeOutExpo(t: number): number {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+
+function animateScroll(element: HTMLElement, target: number, duration = 650) {
   if (activeScrollAnimationId !== null) {
     cancelAnimationFrame(activeScrollAnimationId);
   }
@@ -176,8 +181,14 @@ function animateScroll(element: HTMLElement, target: number, duration = 900) {
   const start = element.scrollTop;
   const change = target - start;
 
-  if (Math.abs(change) < 2) {
+  if (Math.abs(change) < 1) {
     element.scrollTop = target;
+    return;
+  }
+
+  // Use CSS scroll-behavior for smooth native scrolling when available
+  if ('scrollBehavior' in element.style) {
+    element.scrollTo({ top: target, behavior: 'smooth' });
     return;
   }
 
@@ -186,15 +197,9 @@ function animateScroll(element: HTMLElement, target: number, duration = 900) {
   const animate = (time: number) => {
     const elapsed = time - startTime;
     const progress = Math.min(elapsed / duration, 1);
+    const eased = easeOutExpo(progress);
 
-    // Elastic easeOut for custom bounce with soft stop
-    let ease = 1;
-    if (progress < 1) {
-      const p = progress;
-      ease = (Math.pow(2, -10 * p) * Math.sin(((p - 0.075) * (2 * Math.PI)) / 0.3)) + 1;
-    }
-
-    element.scrollTop = start + (change * ease);
+    element.scrollTop = start + (change * eased);
 
     if (progress < 1) {
       activeScrollAnimationId = requestAnimationFrame(animate);

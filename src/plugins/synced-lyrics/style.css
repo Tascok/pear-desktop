@@ -69,28 +69,28 @@
   --lyrics-width: 100%;
 
   /* Inactive Lyrics */
-  --lyrics-inactive-font-weight: 600;
-  --lyrics-inactive-opacity: 0.35;
-  --lyrics-inactive-scale: 0.94;
+  --lyrics-inactive-font-weight: 400;
+  --lyrics-inactive-opacity: 0.25;
+  --lyrics-inactive-scale: 0.93;
   --lyrics-inactive-offset: 0;
 
   /* Active Lyrics */
-  --lyrics-active-font-weight: 800;
+  --lyrics-active-font-weight: 600;
   --lyrics-active-opacity: 1;
-  --lyrics-active-scale: 1.04;
+  --lyrics-active-scale: 1.02;
   --lyrics-active-offset: 0;
 
   /* Word-level Active (overrides line-level for individual words) */
-  --lyrics-word-active-color: #fff;
-  --lyrics-inactive-text-color: rgba(255, 255, 255, 0.32);
+  --lyrics-word-active-color: #ffffff;
+  --lyrics-inactive-text-color: rgba(255, 255, 255, 0.28);
 
   --lyrics-duration: 2s;
 
-  --lyrics-scale-duration: 0.4s;
-  --lyrics-opacity-transition: 0.4s;
+  --lyrics-scale-duration: 0.5s;
+  --lyrics-opacity-transition: 0.5s;
 
   /* Colors */
-  --glow-color: rgba(255, 255, 255, 0.5);
+  --glow-color: rgba(255, 255, 255, 0.4);
 }
 
 .lyric-container {
@@ -142,16 +142,20 @@
   scale: var(--lyrics-inactive-scale);
   translate: var(--lyrics-inactive-offset);
   transition:
-    scale var(--lyrics-scale-duration) cubic-bezier(0.175, 0.885, 0.32, 1.275),
-    translate var(--lyrics-scale-duration) cubic-bezier(0.175, 0.885, 0.32, 1.275),
-    opacity var(--lyrics-opacity-transition) cubic-bezier(0.25, 1, 0.5, 1),
-    filter var(--lyrics-opacity-transition) cubic-bezier(0.25, 1, 0.5, 1) !important;
-
+    scale var(--lyrics-scale-duration) cubic-bezier(0.34, 1.2, 0.64, 1),
+    translate var(--lyrics-scale-duration) cubic-bezier(0.34, 1.2, 0.64, 1),
+    opacity var(--lyrics-opacity-transition) cubic-bezier(0.4, 0, 0.2, 1),
+    filter var(--lyrics-opacity-transition) cubic-bezier(0.4, 0, 0.2, 1),
+    letter-spacing 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   display: block;
   text-align: left;
   margin: var(--global-margin) 0;
   transform-origin: 0 50%;
   filter: blur(0px);
+  letter-spacing: -0.02em;
 
   &.lrc-header {
     color: var(--ytmusic-color-grey5) !important;
@@ -188,8 +192,9 @@
   background-image: linear-gradient(
     to right,
     var(--lyrics-word-active-color, #fff) 0%,
-    var(--lyrics-word-active-color, #fff) calc(var(--word-progress, 0) * 100% - 10px),
-    var(--lyrics-inactive-text-color, rgba(255, 255, 255, 0.32)) calc(var(--word-progress, 0) * 100% + 10px)
+    var(--lyrics-word-active-color, #fff) calc(var(--word-progress, 0) * 100% - 6px),
+    rgba(255, 255, 255, 0.7) calc(var(--word-progress, 0) * 100% + 4px),
+    var(--lyrics-inactive-text-color, rgba(255, 255, 255, 0.32)) calc(var(--word-progress, 0) * 100% + 16px)
   );
   background-clip: text;
   -webkit-background-clip: text;
@@ -198,11 +203,12 @@
   
   transform-origin: left center !important;
   text-shadow:
-    0 0 calc(2px + var(--word-glow, 0) * 8px) rgba(255, 255, 255, calc(0.25 + var(--word-glow, 0) * 0.6));
-  transform: scaleX(calc(1 + var(--word-glow, 0) * 0.035));
+    0 0 calc(3px + var(--word-glow, 0) * 16px) rgba(255, 255, 255, calc(0.35 + var(--word-glow, 0) * 0.4)),
+    0 0 calc(8px + var(--word-glow, 0) * 24px) rgba(255, 255, 255, calc(0.12 + var(--word-glow, 0) * 0.15));
+  transform: scaleX(calc(1 + var(--word-glow, 0) * 0.02)) scaleY(calc(1 + var(--word-glow, 0) * 0.035));
   transition:
-    transform 0.15s cubic-bezier(0.25, 1, 0.5, 1),
-    text-shadow 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    text-shadow 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Word fully sung — solid active color, no effects, instant transition */
@@ -880,4 +886,97 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
 }
 #pear-animated-artwork.pear-animated-artwork--active {
   opacity: 1;
+}
+
+/* ─── Enhanced Lyrics Animations ─── */
+
+/* Smooth scroll with better easing */
+.synced-lyrics-vlist {
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.synced-lyrics-vlist::-webkit-scrollbar {
+  display: none;
+}
+
+/* Line entrance animation */
+@keyframes lyrics-line-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Subtle breathing effect on active line */
+@keyframes lyrics-breathe {
+  0%, 100% {
+    text-shadow: 0 0 calc(var(--word-glow, 0) * 4px) rgba(255, 255, 255, 0);
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Current line enhanced styling */
+.synced-line.current .text-lyrics {
+  opacity: 1 !important;
+  font-weight: var(--lyrics-active-font-weight) !important;
+  scale: var(--lyrics-active-scale);
+  filter: blur(0px) !important;
+  -webkit-text-fill-color: var(--lyrics-word-active-color, #fff) !important;
+  color: var(--lyrics-word-active-color, #fff) !important;
+  letter-spacing: -0.01em;
+  transition:
+    scale 0.6s cubic-bezier(0.34, 1.2, 0.64, 1),
+    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    letter-spacing 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    font-weight 0.4s ease;
+}
+
+/* Previous line — smoother fade out */
+.synced-line.previous .text-lyrics {
+  opacity: var(--lyrics-inactive-opacity);
+  filter: blur(1.5px);
+  scale: var(--lyrics-inactive-scale);
+  transform-origin: left center;
+  transition:
+    opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+    scale 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Upcoming line — softer entry */
+.synced-line.upcoming .text-lyrics {
+  opacity: calc(var(--lyrics-inactive-opacity) * 1.8);
+  filter: blur(1px);
+  scale: var(--lyrics-inactive-scale);
+  transition:
+    opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    scale 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Word progress bar effect — smooth fill line under words */
+.text-lyrics > span > span::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  width: calc(var(--word-progress, 0) * 100%);
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0));
+  border-radius: 1px;
+  opacity: calc(var(--word-glow, 0) * 0.6);
+  transition: width 0.1s linear, opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.text-lyrics > span > span {
+  position: relative;
 }
