@@ -161,7 +161,7 @@ export const renderer = createRenderer<
     pearVideo.muted = true;
     pearVideo.playsInline = true;
     pearVideo.loop = true;
-    pearVideo.style.display = 'none';
+    // No display:none — must be visible to play animated artwork
     document.body.appendChild(pearVideo);
 
     const syncAnimatedArtwork = () => {
@@ -184,6 +184,7 @@ export const renderer = createRenderer<
       if (blsObserver) return;
       blsObserver = new MutationObserver((mutations) => {
         for (const m of mutations) {
+          // Catch #bls-video appearing via DOM insertion
           if (m.addedNodes.length) {
             for (const node of m.addedNodes) {
               if (node instanceof Element && node.matches('video#bls-video')) {
@@ -196,9 +197,17 @@ export const renderer = createRenderer<
               }
             }
           }
+          // Catch src/currentSrc changing on an existing #bls-video (new song)
+          if (
+            m.target instanceof HTMLVideoElement &&
+            m.target.id === 'bls-video' &&
+            (m.attributeName === 'src' || m.attributeName === 'currentSrc')
+          ) {
+            syncAnimatedArtwork();
+          }
         }
       });
-      blsObserver.observe(document.body, { childList: true, subtree: true });
+      blsObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'currentSrc'] });
     };
 
     ctx.ipc.on('peard:update-song-info', (info: SongInfo) => {
