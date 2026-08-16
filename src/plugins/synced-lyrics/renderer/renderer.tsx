@@ -166,51 +166,6 @@ const lyricsPicker: LyricsRendererChild = { kind: 'LyricsPicker' };
 export const [currentTime, setCurrentTime] = createSignal<number>(-1);
 export const [currentIndex, setCurrentIndex] = createSignal<number>(0);
 
-let activeScrollAnimationId: number | null = null;
-
-// Smooth, organic easing — Apple Music style (no bounce)
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function animateScroll(element: HTMLElement, target: number, duration = 500) {
-  if (activeScrollAnimationId !== null) {
-    cancelAnimationFrame(activeScrollAnimationId);
-  }
-
-  const start = element.scrollTop;
-  const change = target - start;
-
-  if (Math.abs(change) < 1) {
-    element.scrollTop = target;
-    return;
-  }
-
-  // Use CSS scroll-behavior for smooth native scrolling when available
-  if ('scrollBehavior' in element.style) {
-    element.scrollTo({ top: target, behavior: 'smooth' });
-    return;
-  }
-
-  const startTime = performance.now();
-
-  const animate = (time: number) => {
-    const elapsed = time - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    const eased = easeInOutCubic(progress);
-
-    element.scrollTop = start + (change * eased);
-
-    if (progress < 1) {
-      activeScrollAnimationId = requestAnimationFrame(animate);
-    } else {
-      activeScrollAnimationId = null;
-    }
-  };
-
-  activeScrollAnimationId = requestAnimationFrame(animate);
-}
-
 export const LyricsRenderer = () => {
   const [scroller, setScroller] = createSignal<VirtualizerHandle>();
   const [stickyRef, setStickRef] = createSignal<HTMLElement | null>(null);
@@ -442,21 +397,18 @@ export const LyricsRenderer = () => {
     if (found) {
       const container = document.querySelector('.synced-lyrics-vlist') as HTMLElement;
       if (container) {
-        const startScrollTop = container.scrollTop;
-        scroller()!.scrollToIndex(vlistIndex, {
-          align: 'center',
-        });
+        // Pre-calculate target position without triggering scroll,
+        // then let CSS scroll-behavior:'smooth' animate natively
+        // on the compositor thread (no main-thread RAF jank).
+        scroller()!.scrollToIndex(vlistIndex, { align: 'center' });
         const targetScrollTop = container.scrollTop;
-        container.scrollTop = startScrollTop;
-
-        console.log('[Lyrics] animateScroll', { vlistIndex, startScrollTop, targetScrollTop });
-        animateScroll(container, targetScrollTop);
-      } else {
-        console.warn('[Lyrics] .synced-lyrics-vlist not in DOM, using smooth scroll');
-        scroller()!.scrollToIndex(vlistIndex, {
-          smooth: true,
-          align: 'center',
+        container.scrollTop = 0; // reset to avoid jump
+        requestAnimationFrame(() => {
+          container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
         });
+      } else {
+        console.warn('[Lyrics] .synced-lyrics-vlist not in DOM');
+        scroller()!.scrollToIndex(vlistIndex, { align: 'center' });
       }
     } else {
       console.warn('[Lyrics] lineIdx', lineIdx, 'not found in children(), skipping scroll');

@@ -891,11 +891,13 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
 
 /* ─── Enhanced Lyrics Animations ─── */
 
-/* Smooth scroll with better easing */
+/* Smooth scroll — GPU-accelerated, compositor-thread animation */
 .synced-lyrics-vlist {
   scroll-behavior: smooth;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  will-change: scroll-position;
+  overscroll-behavior: contain;
 }
 .synced-lyrics-vlist::-webkit-scrollbar {
   display: none;
