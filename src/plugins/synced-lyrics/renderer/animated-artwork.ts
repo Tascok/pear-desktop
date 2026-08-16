@@ -85,7 +85,7 @@ async function fetchAnimatedVideoUrl(appleMusicUrl: string, netFetch: NetFetch):
   const target = parseCatalogTarget(appleMusicUrl);
   if (!target) return null;
 
-  const token = await fetchBearerToken(appleMusicUrl, netFetch);
+  const token = await getBearerToken(netFetch);
   if (!token) return null;
 
   const apiUrl = `https://amp-api.music.apple.com/v1/catalog/${target.storefront}/${target.resourceType}/${target.resourceId}?extend=editorialVideo&platform=web`;
@@ -115,9 +115,28 @@ async function fetchAnimatedVideoUrl(appleMusicUrl: string, netFetch: NetFetch):
   }
 }
 
+// The JWT token is embedded in the JS bundle and valid for months — cache it
+// so we only scrape music.apple.com once instead of per-candidate-album.
+let cachedToken: string | null = null;
+let cachedTokenExpires = 0;
+
+async function getBearerToken(netFetch: NetFetch): Promise<string | null> {
+  if (cachedToken && Date.now() < cachedTokenExpires) return cachedToken;
+  const token = await fetchBearerToken('https://music.apple.com', netFetch);
+  if (token) {
+    cachedToken = token;
+    // JWTs encode exp as a Unix timestamp; decay the cache well before that.
+    cachedTokenExpires = Date.now() + 3600_000; // 1 hour
+  }
+  return token;
+}
+
 /**
  * Queries the iTunes Search API for a song, then resolves the Apple Music
  * animated artwork URL via the Apple Music catalog API.
+ *
+ * Searches for multiple candidates and tries each until one with Motion Art
+ * is found, preferring the full album over a single when both appear.
  *
  * Returns a `videoSrc` (HLS .m3u8) when the album has Motion Art, plus a
  * high-resolution static artwork fallback.
@@ -129,20 +148,58 @@ export async function fetchAnimatedArtwork(
   const { title, artist, album } = info;
   if (!title || !artist) return {};
 
+  const log = (msg: string, ...args: unknown[]) =>
+    console.log(`[animated-artwork] ${msg}`, ...args);
+
   try {
-    // Search iTunes for the track
+    // Search iTunes for the track — ask for several results so we can pick
+    // the one whose album has animated artwork instead of grabbing an
+    // arbitrary "Single" release with no Motion Art.
     const query = encodeURIComponent(`${artist} ${title}`);
-    const searchUrl = `https://itunes.apple.com/search?term=${query}&entity=song&limit=1`;
+    const searchUrl = `https://itunes.apple.com/search?term=${query}&entity=song&limit=10`;
     const [status, body] = await netFetch(searchUrl, {
       headers: { Accept: 'application/json' },
     });
     if (status !== 200) return {};
 
     const data = JSON.parse(body) as iTunesResult;
-    let result = data.results?.[0];
+    const songResults = data.results ?? [];
 
-    // Fallback: search by album when no song matched
-    if (!result && album) {
+    // De-duplicate by collectionViewUrl so we don't query the same album twice.
+    const seen = new Set<string>();
+    const candidateUrls: string[] = [];
+    for (const r of songResults) {
+      const u = r.collectionViewUrl;
+      if (u && !seen.has(u)) {
+        seen.add(u);
+        candidateUrls.push(u);
+      }
+    }
+    log('iTunes candidates:', candidateUrls);
+
+    // Try each candidate album; first one with Motion Art wins.
+    for (const appleMusicUrl of candidateUrls) {
+      const videoSrc = await fetchAnimatedVideoUrl(appleMusicUrl, netFetch);
+      log(`trying ${appleMusicUrl} -> ${videoSrc ? 'HAS MOTION ART' : 'no'}`);
+      if (videoSrc) {
+        // Prefer the iTunes static artwork that matches the album with art.
+        const matched = songResults.find((r) => r.collectionViewUrl === appleMusicUrl);
+        const staticArtwork = matched
+          ? resizeArtworkUrl(matched.artworkUrl100, 600)
+          : undefined;
+        return { videoSrc, staticArtwork };
+      }
+    }
+
+    // No album had Motion Art — fall back to the first result's static art.
+    if (songResults.length > 0) {
+      log('no Motion Art found for any candidate; using first result static art');
+      const staticArtwork = resizeArtworkUrl(songResults[0].artworkUrl100, 600);
+      return { staticArtwork };
+    }
+
+    // Fallback: search by album
+    if (album) {
       const albumQuery = encodeURIComponent(`${artist} ${album}`);
       const albumUrl = `https://itunes.apple.com/search?term=${albumQuery}&entity=album&limit=1`;
       const [aStatus, aBody] = await netFetch(albumUrl, {
@@ -150,18 +207,21 @@ export async function fetchAnimatedArtwork(
       });
       if (aStatus === 200) {
         const aData = JSON.parse(aBody) as iTunesResult;
-        result = aData.results?.[0];
+        const aResult = aData.results?.[0];
+        if (aResult) {
+          const staticArtwork = resizeArtworkUrl(aResult.artworkUrl100, 600);
+          const appleMusicUrl = aResult.collectionViewUrl;
+          if (appleMusicUrl) {
+            const videoSrc = await fetchAnimatedVideoUrl(appleMusicUrl, netFetch);
+            if (videoSrc) return { videoSrc, staticArtwork };
+          }
+          return { staticArtwork };
+        }
       }
     }
-    if (!result) return {};
-
-    const staticArtwork = resizeArtworkUrl(result.artworkUrl100, 600);
-    const appleMusicUrl = result.collectionViewUrl || result.trackViewUrl;
-    if (!appleMusicUrl) return { staticArtwork };
-
-    const videoSrc = await fetchAnimatedVideoUrl(appleMusicUrl, netFetch);
-    return videoSrc ? { videoSrc, staticArtwork } : { staticArtwork };
-  } catch {
+    return {};
+  } catch (e) {
+    log('error:', (e as Error)?.message ?? e);
     return {};
   }
 }

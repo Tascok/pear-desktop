@@ -833,8 +833,8 @@ body.has-synced-lyrics-bg.webgl-active ytmusic-player-bar::before {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.5s ease;
-  z-index: 1;
+  z-index: 2;
 }
-#pear-animated-artwork[src]:not([src=""]) {
+#pear-animated-artwork.pear-animated-artwork--active {
   opacity: 1;
 }

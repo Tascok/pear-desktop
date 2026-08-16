@@ -188,21 +188,33 @@ export const renderer = createRenderer<
     const loadVideoSource = async (src: string) => {
       const isM3u8 = src.includes('.m3u8');
 
-      // .m3u8 (HLS) needs hls.js on Chromium; native HLS only works in Safari.
       if (isM3u8) {
         const hlsLib = await ensureHls();
-        if (!hlsLib) return false;
-
-        if (!hlsLib.isSupported()) return false;
+        if (!hlsLib) {
+          console.warn('[pear-animated-artwork] hls.js failed to load — cannot play .m3u8');
+          return false;
+        }
+        if (!hlsLib.isSupported()) {
+          console.warn('[pear-animated-artwork] HLS not supported in this environment');
+          return false;
+        }
 
         destroyHls();
         const hls = new hlsLib();
         currentHls = hls;
         hls.loadSource(src);
         hls.attachMedia(pearVideo);
+        console.log('[pear-animated-artwork] loading HLS stream:', src);
         await new Promise<void>((resolve) => {
-          hls.on(hlsLib.Events.MANIFEST_PARSED, () => resolve());
-          hls.on(hlsLib.Events.ERROR, () => resolve());
+          hls.on(hlsLib.Events.MANIFEST_PARSED, () => {
+            console.log('[pear-animated-artwork] HLS manifest parsed — stream ready');
+            pearVideo.classList.add('pear-animated-artwork--active');
+            resolve();
+          });
+          hls.on(hlsLib.Events.ERROR, (_event, data) => {
+            console.error('[pear-animated-artwork] HLS error:', data);
+            resolve();
+          });
         });
         return true;
       }
@@ -213,6 +225,8 @@ export const renderer = createRenderer<
         pearVideo.src = src;
         pearVideo.load();
       }
+      pearVideo.classList.add('pear-animated-artwork--active');
+      console.log('[pear-animated-artwork] loading direct video:', src);
       return true;
     };
 
@@ -230,6 +244,11 @@ export const renderer = createRenderer<
         const result = await fetchAnimatedArtwork(info, netFetch);
         if (signal.aborted) return;
 
+        console.log('[pear-animated-artwork] result for', info.title, '->', {
+          videoSrc: result.videoSrc ? result.videoSrc.slice(0, 80) + '…' : undefined,
+          staticArtwork: result.staticArtwork?.slice(0, 80) + '…',
+        });
+
         if (result.videoSrc) {
           // Animated artwork found — load via hls.js (m3u8) or direct src
           const loaded = await loadVideoSource(result.videoSrc);
@@ -241,16 +260,20 @@ export const renderer = createRenderer<
           if (isPlaying && pearVideo.paused) void pearVideo.play().catch(() => {});
           else if (!isPlaying && !pearVideo.paused) pearVideo.pause();
 
-          // Update static album art to high-res iTunes version as fallback
+          // High-res iTunes static art sits underneath the animated overlay
           if (result.staticArtwork && info.imageSrc !== result.staticArtwork) {
             const img = document.querySelector('#song-image yt-img-shadow > img') as HTMLImageElement | null;
             if (img) img.src = result.staticArtwork;
           }
-        } else if (result.staticArtwork && info.imageSrc !== result.staticArtwork) {
-          // No animated artwork — upgrade to high-res static image
-          const img = document.querySelector('#song-image yt-img-shadow > img') as HTMLImageElement | null;
-          if (img) img.src = result.staticArtwork;
+        } else {
+          // No Motion Art — hide the overlay and use the upgraded static art
+          if (result.staticArtwork && info.imageSrc !== result.staticArtwork) {
+            const img = document.querySelector('#song-image yt-img-shadow > img') as HTMLImageElement | null;
+            if (img) img.src = result.staticArtwork;
+            console.log('[pear-animated-artwork] upgraded static art (no Motion Art)');
+          }
           destroyHls();
+          pearVideo.classList.remove('pear-animated-artwork--active');
           pearVideo.style.display = 'none';
           pearVideo.removeAttribute('src');
         }
