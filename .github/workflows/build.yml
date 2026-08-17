@@ -83,6 +83,7 @@ jobs:
           pnpm release:win
 
       - name: Test
+        if: startsWith(matrix.os, 'windows') != true
         uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
